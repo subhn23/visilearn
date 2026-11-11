@@ -1,0 +1,79 @@
+# visilearn: roadmap & TODO
+
+Status legend: `[x]` done · `[ ]` to do · `[~]` in progress.
+Every item is built **test-first** (see AGENTS.md). Keep this file current as work lands.
+
+---
+
+## Done so far
+
+- [x] Engine core: parser, compiler with "did you mean" diagnostics, automatic layout, headless runtime
+- [x] Pack `net`: firewalls, routing, packets, live rule editor, packet lab (3 lessons)
+- [x] Pack `linux`: filesystem tree, simulated shell, terminal with history/Tab (3 lessons)
+- [x] Alpine + Tailwind retro UI, light/dark/auto themes, mobile layout
+- [x] Client-side progress with JSON export/import
+- [x] Authoring MCP server (`get_vocab`, `validate`, `simulate`, `list_scenes`, `read_scene`, `save_scene`)
+- [x] Normative grammar `docs/GRAMMAR.md` (test-enforced), AGENTS.md, CLAUDE.md
+
+---
+
+## Phase 1: Modules (share & import, no AI)
+
+A **module** is a portable bundle of lessons: `{ format, version, id, title, description, author, track, tags, sources, scenes[] }`.
+
+- [ ] Module format v1: create, serialize, parse, validate (shape, size limits, every scene compiles, unique scene ids)
+- [ ] Spec the module format in `docs/MODULES.md` (normative, versioned)
+- [ ] Share links: compress module into the URL fragment (`#/import/<payload>`); round-trip, tamper and oversize handling
+- [ ] Module store: save/list/get/remove on an async key-value backend (IndexedDB in browser, memory in tests)
+- [ ] Scene keys for module lessons (`m:<moduleId>/<sceneId>`) so ids never clash with built-in lessons; progress works per key
+- [ ] Catalog: **My modules** section (cards listing their lessons, progress, open / export / copy link / delete)
+- [ ] Import: file picker + drag-and-drop, and an import-from-link preview screen ("Add to My modules")
+- [ ] Player opens module lessons (`#/s/m:<moduleId>/<sceneId>`)
+- [ ] e2e: import a module file, open a lesson, export it, share link round-trip
+- [ ] Docs: README, AGENTS.md, CLAUDE.md, GRAMMAR.md (if language touched)
+
+## Phase 2: Model connections (local first)
+
+- [ ] Provider interface: `listModels`, `chat` (streaming), structured JSON output, cancel
+- [ ] Ollama provider (default): `/api/tags`, `/api/chat` with `format` (JSON schema)
+- [ ] OpenAI-compatible provider: LM Studio, llama.cpp server, vLLM, OpenRouter, OpenAI
+- [ ] Anthropic provider (browser access header) · Gemini provider
+- [ ] Settings screen: provider list, base URL, model picker, API key (device-only, clearly labelled), **Test connection**
+- [ ] Guided setup for Ollama CORS (`OLLAMA_ORIGINS`) with copyable command and diagnosis of common failures
+- [ ] Tests with fake fetch for every provider (no network in unit tests)
+- [ ] Optional later: in-browser models (WebGPU) for zero-install local use
+
+## Phase 3: Studio (AI agent that builds modules from your files)
+
+- [~] Read files in the browser: PDF (pdf.js), DOCX (mammoth), Markdown, TXT
+- [~] Split documents into sections (chapters/headings) with page references
+- [x] Tested against the sample books in `pdfs/` (Git, PostgreSQL)
+- [ ] Agent step 1, outline: model proposes lessons per section (structured JSON), user can edit/approve
+- [ ] Agent step 2, draft: structured lesson plan (JSON) → deterministic converter → scene text
+- [ ] Agent step 3, repair loop: compiler diagnostics fed back to the model (max N rounds)
+- [ ] Agent step 4, verify: headless simulate; challenges must be unmet at start
+- [ ] Live preview in the player while generating; edit source, regenerate one lesson
+- [ ] Save as a module (author, sources with pages, licence note)
+- [ ] Guardrails: paraphrase, never copy long passages; record source pages for reviewers
+- [ ] Grammar → GBNF / JSON schema export for constrained decoding (llama.cpp / Ollama `format`)
+
+## Phase 4: `concept` pack (any subject)
+
+- [ ] Generic entities (box, actor, store, process…), arrows, states, groups
+- [ ] Verbs: `move`, `set`, `show`, `hide`, `connect`, `flow` (animated token along an arrow)
+- [ ] Goals for quizzes/ordering/matching
+- [ ] GRAMMAR.md section + lessons built from the sample books (Git, PostgreSQL)
+
+## Phase 5: Marketplace (crowdsourced)
+
+- [ ] Decide hosting: GitHub registry (static, PR-based) vs Firebase with sign-in
+- [ ] Publish flow: export → submit (PR) → automated validation (compile + simulate + size) → review
+- [ ] Static index of published modules (built by CI) and browse/search in the app
+- [ ] Ratings & reviews (e.g. GitHub Discussions), author profiles, report abuse
+- [ ] Moderation guidelines and licence rules (original or properly licensed content only)
+
+## Housekeeping
+
+- [ ] Choose a licence for the project
+- [ ] CI: run `tsc`, unit tests, `check`, e2e on every push
+- [ ] Offline support (service worker) · i18n (Hindi, Odia, …)

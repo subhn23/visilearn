@@ -1,0 +1,10 @@
+import { readFileSync } from 'node:fs';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { extractPdfLines } from '../../src/studio/extract/pdf.ts';
+const doc = await extractPdfLines(new Uint8Array(readFileSync(process.argv[2])), pdfjs as any);
+const hist = new Map<number, number>();
+for (const l of doc.lines) hist.set(Math.round(l.size * 2) / 2, (hist.get(Math.round(l.size * 2) / 2) ?? 0) + 1);
+console.log('pages', doc.pages, 'lines', doc.lines.length);
+console.log([...hist].sort((a, b) => b[0] - a[0]).slice(0, 14).map(([s, n]) => `${s}:${n}`).join('  '));
+for (const l of doc.lines.filter((l) => /^(Chapter \d+|Section \d+\.\d+)/.test(l.text)).slice(0, 8)) console.log(l.size, l.page, l.text);
+for (const l of doc.lines.filter((l) => l.size >= 20).slice(0, 8)) console.log('BIG', l.size, l.page, l.text.slice(0, 60));

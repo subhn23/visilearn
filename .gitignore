@@ -3,3 +3,6 @@ dist
 .firebase
 *.log
 .DS_Store
+
+# sample books for local testing (large, third-party content)
+pdfs/

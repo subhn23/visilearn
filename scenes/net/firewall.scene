@@ -1,0 +1,33 @@
+scene net.firewall "Firewalls: who gets in?"
+about "A firewall checks every packet against its rules, top to bottom. First match wins."
+use net
+
+host laptop 198.51.100.7 label="Admin laptop"
+internet ext label="Internet"
+fw edge 203.0.113.1
+server web 203.0.113.10 port=80,22 label="Web server"
+
+link laptop edge web
+link ext edge
+
+rules edge editable policy=deny
+  allow tcp:80 to web
+
+step "Anyone can open the website (port 80)"
+  say "Rule 1 on the firewall allows TCP port 80 to the web server, from anywhere."
+  laptop send web:80
+  ext send web:80
+
+step "What about SSH (port 22)?"
+  ask "The admin tries to SSH into the server. What happens?" "It gets through" "The firewall drops it" "The server refuses it" answer=2
+  laptop send web:22
+  note edge "No rule matched → default policy: deny"
+
+step "Challenge: let only the admin SSH in"
+  say "Edit the firewall rules on the right. Use the packet lab to test your idea."
+  hint "Add a rule like: allow tcp:22 from laptop to web"
+  goal laptop->web:22 ok, ext->web:22 blocked, ext->web:80 ok
+
+step "Order matters"
+  say "Rules are checked top to bottom and the first match wins."
+  ask "If 'deny any' were rule 1, what would happen to website traffic?" "Still allowed" "Blocked: deny any matches first" answer=2

@@ -1,0 +1,243 @@
+import { parse, splitArgs, takeIdList } from './parser.ts';
+import { didYouMean } from './suggest.ts';
+import type {
+  Action, CompileCtx, Diag, Entity, PackDef, PackRegistry, Scene, Step, Stmt, Token,
+} from './types.ts';
+
+export interface CompileResult {
+  scene: Scene | null;
+  diags: Diag[];
+}
+
+const ID = /^[A-Za-z][\w-]*$/;
+const CORE_TOP = ['scene', 'use', 'about', 'link', 'step'];
+const CORE_VERBS = ['say', 'hint', 'highlight', 'note', 'ask', 'goal', 'wait'];
+const COMMON_PROPS = ['label', 'info', 'col'];
+
+export function compile(src: string, registry: PackRegistry): CompileResult {
+  const { stmts, diags } = parse(src);
+  const error = (line: number, msg: string) => diags.push({ line, severity: 'error', msg });
+  const warn = (line: number, msg: string) => diags.push({ line, severity: 'warning', msg });
+
+  const scene: Scene = { id: '', title: '', about: '', packs: [], entities: [], links: [], steps: [], data: {} };
+  const byId = new Map<string, Entity>();
+  const c: CompileCtx = {
+    scene,
+    error,
+    warn,
+    hasEntity: (id) => byId.has(id),
+    entity(id, line) {
+      const e = byId.get(id);
+      if (!e) error(line, `unknown entity '${id}'${didYouMean(id, byId.keys())}`);
+      return e;
+    },
+  };
+
+  // ---- header -------------------------------------------------------------
+  const head = stmts[0];
+  if (!head || head.head !== 'scene') {
+    error(head?.line ?? 1, 'first line must be: scene <id> "Title"');
+    return { scene: null, diags };
+  }
+  {
+    const { pos } = splitArgs(head.args);
+    scene.id = pos[0]?.v ?? '';
+    scene.title = pos[1]?.v ?? '';
+    if (!/^[a-z][\w-]*(\.[\w-]+)*$/.test(scene.id)) error(head.line, `scene id '${scene.id}' must look like pack.name (lowercase)`);
+    if (!scene.title) error(head.line, 'scene needs a "Title"');
+  }
+
+  const packs: PackDef[] = [];
+  for (const s of stmts) {
+    if (s.head !== 'use') continue;
+    for (const name of s.args.flatMap((t) => t.v.split(',')).filter(Boolean)) {
+      const p = registry[name];
+      if (!p) error(s.line, `unknown pack '${name}'${didYouMean(name, Object.keys(registry))}; available: ${Object.keys(registry).join(', ')}`);
+      else if (!packs.includes(p)) { packs.push(p); scene.packs.push(name); }
+    }
+  }
+  if (!packs.length) error(head.line, `missing 'use <pack>'; available: ${Object.keys(registry).join(', ')}`);
+
+  const kindOf = (k: string) => packs.find((p) => p.entities[k]);
+  const directiveOf = (k: string) => packs.find((p) => p.directives?.[k]);
+  const verbOf = (k: string) => packs.find((p) => p.verbs?.[k]);
+  const allTop = () => [...CORE_TOP, ...packs.flatMap((p) => [...Object.keys(p.entities), ...Object.keys(p.directives ?? {})])];
+
+  // ---- pass 1: entities -----------------------------------------------------
+  for (const s of stmts.slice(1)) {
+    const pack = kindOf(s.head);
+    if (!pack) continue;
+    const kind = pack.entities[s.head];
+    const { pos, kv } = splitArgs(s.args);
+    const { ids, rest } = takeIdList(pos);
+    if (!ids.length) { error(s.line, `${s.head} needs an id, e.g. '${s.head} a1'`); continue; }
+    const allowed = [...COMMON_PROPS, ...Object.keys(kind.props ?? {})];
+    for (const k of Object.keys(kv)) {
+      if (!allowed.includes(k)) warn(s.line, `unknown prop '${k}' on ${s.head}${didYouMean(k, allowed)}; allowed: ${allowed.join(', ')}`);
+    }
+    if (rest.length > (kind.sub ? 1 : 0)) warn(s.line, `extra values ignored: ${rest.slice(kind.sub ? 1 : 0).map((t) => t.v).join(' ')}`);
+    for (const id of ids) {
+      if (!ID.test(id)) { error(s.line, `invalid id '${id}' (letters, digits, - and _ ; start with a letter)`); continue; }
+      if (byId.has(id)) { error(s.line, `duplicate id '${id}'`); continue; }
+      const e: Entity = {
+        id,
+        kind: s.head,
+        pack: pack.name,
+        label: ids.length > 1 ? id : kv.label ?? id,
+        sub: kind.sub ? rest[0]?.v : undefined,
+        props: kv,
+        line: s.line,
+      };
+      byId.set(id, e);
+      scene.entities.push(e);
+    }
+    if (s.children.length) warn(s.children[0].line, `${s.head} takes no indented lines`);
+  }
+
+  // ---- pass 2: links, directives, unknown statements ------------------------
+  const linked = new Set<string>();
+  for (const s of stmts.slice(1)) {
+    if (kindOf(s.head)) continue;
+    switch (s.head) {
+      case 'use':
+      case 'step':
+        break;
+      case 'scene':
+        error(s.line, 'only one scene per file');
+        break;
+      case 'about':
+        scene.about = s.args.map((t) => t.v).join(' ');
+        break;
+      case 'link': {
+        const ids = s.args.flatMap((t) => t.v.split(/,|--/)).filter(Boolean);
+        if (ids.length < 2) { error(s.line, 'link needs 2+ ids: link a b c  (chains a–b–c)'); break; }
+        for (let i = 0; i < ids.length - 1; i++) {
+          if (c.entity(ids[i], s.line) && c.entity(ids[i + 1], s.line)) {
+            scene.links.push([ids[i], ids[i + 1]]);
+            linked.add(ids[i]); linked.add(ids[i + 1]);
+          }
+        }
+        break;
+      }
+      default: {
+        const p = directiveOf(s.head);
+        if (p) p.directives![s.head].compile(s, c);
+        else if (byId.has(s.head) || verbOf(s.head) || CORE_VERBS.includes(s.head)) {
+          error(s.line, `'${s.head}' is an action; put it inside a step`);
+        } else {
+          error(s.line, `unknown statement '${s.head}'${didYouMean(s.head, allTop())}`);
+        }
+      }
+    }
+  }
+  if (scene.links.length) {
+    for (const e of scene.entities) if (!linked.has(e.id)) warn(e.line, `'${e.id}' is not linked to anything`);
+  }
+
+  // ---- pass 3: steps --------------------------------------------------------
+  for (const s of stmts) {
+    if (s.head !== 'step') continue;
+    const { pos } = splitArgs(s.args);
+    const step: Step = { line: s.line, text: pos.map((t) => t.v).join(' '), say: [], hints: [], actions: [], asks: [], goals: [] };
+    if (!step.text) error(s.line, 'step needs text: step "What the learner sees"');
+    for (const a of s.children) compileStepLine(a, step, c, packs, verbOf, byId);
+    scene.steps.push(step);
+  }
+  if (!scene.steps.length) error(head.line, 'scene has no steps; add: step "..."');
+
+  diags.sort((a, b) => a.line - b.line);
+  return { scene: diags.some((d) => d.severity === 'error') ? null : scene, diags };
+}
+
+function compileStepLine(
+  s: Stmt, step: Step, c: CompileCtx, packs: PackDef[],
+  verbOf: (k: string) => PackDef | undefined, byId: Map<string, Entity>,
+) {
+  if (s.children.length) c.warn(s.children[0].line, 'step lines take no indented lines');
+  const text = (ts: Token[]) => ts.map((t) => t.v).join(' ');
+  const push = (a: Action | null) => { if (a) step.actions.push(a); };
+
+  switch (s.head) {
+    case 'say':
+      step.say.push(text(s.args));
+      return;
+    case 'hint':
+      step.hints.push(text(s.args));
+      return;
+    case 'highlight': {
+      const ids = s.args.flatMap((t) => t.v.split(',')).filter(Boolean);
+      if (!ids.length) { c.error(s.line, 'usage: highlight a[, b]'); return; }
+      const ok = ids.filter((id) => c.entity(id, s.line));
+      push({ line: s.line, text: `highlight ${ok.join(', ')}`, run: (rt) => ok.forEach((id) => rt.fx.highlight(id)) });
+      return;
+    }
+    case 'note': {
+      const [id, ...rest] = s.args;
+      const msg = text(rest);
+      if (!id || !msg) { c.error(s.line, 'usage: note <id> "text"'); return; }
+      if (!c.entity(id.v, s.line)) return;
+      push({ line: s.line, text: `note ${id.v}`, run: (rt) => rt.fx.note(id.v, msg) });
+      return;
+    }
+    case 'wait': {
+      const m = /^(\d+(?:\.\d+)?)(ms|s)?$/.exec(s.args[0]?.v ?? '');
+      if (!m) { c.error(s.line, 'usage: wait 500ms | wait 1s'); return; }
+      const ms = parseFloat(m[1]) * (m[2] === 's' ? 1000 : 1);
+      push({ line: s.line, text: `wait ${ms}ms`, run: (rt) => rt.fx.wait(ms) });
+      return;
+    }
+    case 'ask': {
+      const { pos, kv } = splitArgs(s.args);
+      const [q, ...optToks] = pos;
+      let options = optToks.map((t) => t.v);
+      if (options.length === 1 && options[0].includes('|')) options = options[0].split('|');
+      if (!q || options.length < 2) { c.error(s.line, 'usage: ask "Question?" opt1|opt2|opt3 answer=opt2  (or quoted options)'); return; }
+      const ans = kv.answer ?? '';
+      let idx = options.indexOf(ans);
+      if (idx < 0 && /^\d+$/.test(ans)) idx = parseInt(ans, 10) - 1;
+      if (idx < 0 || idx >= options.length) { c.error(s.line, `answer='${ans}' must be an option text or its 1-based number`); return; }
+      const a = { line: s.line, question: q.v, options, answer: idx };
+      step.asks.push(a);
+      push({ line: s.line, text: `ask "${q.v}"`, run: (rt) => rt.ask(a) });
+      return;
+    }
+    case 'goal': {
+      const parts = text(s.args).split(',').map((x) => x.trim()).filter(Boolean);
+      if (!parts.length) { c.error(s.line, 'goal needs a condition'); return; }
+      for (const g of parts) {
+        let parsed = null;
+        for (const p of packs) if (!parsed && p.parseGoal) parsed = p.parseGoal(g, s.line, c);
+        if (parsed) step.goals.push(parsed);
+        else {
+          const usages = packs.map((p) => p.goalUsage).filter(Boolean).join(' | ');
+          c.error(s.line, `can't understand goal '${g}'${usages ? `; forms: ${usages}` : ''}`);
+        }
+      }
+      return;
+    }
+  }
+
+  // pack verbs: "verb args" or "subject verb args"
+  let verb = s.head;
+  let subject: Entity | undefined;
+  let args = s.args;
+  if (!verbOf(verb) && byId.has(verb) && s.args[0] && verbOf(s.args[0].v)) {
+    subject = byId.get(verb);
+    verb = s.args[0].v;
+    args = s.args.slice(1);
+  }
+  const pack = verbOf(verb);
+  if (!pack) {
+    const known = [...CORE_VERBS, ...packs.flatMap((p) => Object.keys(p.verbs ?? {}))];
+    const guess = byId.has(s.head) ? didYouMean(s.args[0]?.v ?? '', known) : didYouMean(s.head, known);
+    c.error(s.line, `unknown action '${byId.has(s.head) ? s.args[0]?.v ?? '' : s.head}'${guess}; actions: ${known.join(', ')}`);
+    return;
+  }
+  const def = pack.verbs![verb];
+  if (def.subject && !subject) {
+    const first = args[0];
+    if (first && byId.has(first.v)) { subject = byId.get(first.v); args = args.slice(1); }
+    else { c.error(s.line, `usage: ${def.usage}`); return; }
+  }
+  push(def.compile(subject, args, s, c));
+}

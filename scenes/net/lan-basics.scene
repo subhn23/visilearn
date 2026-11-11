@@ -1,0 +1,34 @@
+scene net.lan-basics "How a packet finds its way"
+about "Switches connect a local network; routers connect networks together."
+use net
+
+host pc1 192.168.1.10 label="Your PC"
+host pc2 192.168.1.11 label="Printer PC"
+switch sw label="Home switch"
+router gw 192.168.1.1 label="Home router"
+internet isp label="Internet"
+server site 93.184.216.34 port=443 label="Website"
+
+link pc1 sw gw isp site
+link pc2 sw
+
+step "Inside your home network (LAN)"
+  say "Devices on the same LAN talk through the switch. The router is not needed."
+  highlight sw
+  pc1 ping pc2
+
+step "Reaching the outside world"
+  say "To reach another network, packets go to the router (the 'default gateway')."
+  highlight gw
+  pc1 send site:443
+
+step "What if the router fails?"
+  ask "The router goes down. Which still works?" "PC → Website" "PC → Printer PC" "Neither" answer=2
+  kill gw
+  pc1 send site:443
+  pc1 ping pc2
+
+step "Back online"
+  revive gw
+  pc1 send site:443
+  goal pc1->site:443 ok, pc1->pc2 ping ok

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "visilearn": {
+      "command": "node",
+      "args": ["mcp/server.ts"]
+    }
+  }
+}

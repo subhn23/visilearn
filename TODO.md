@@ -75,7 +75,9 @@ Packs must be addable on the go (by the Studio, by modules, later by the marketp
 - [x] Guardrails in prompts (own words, never copy) + source pages recorded · [ ] automatic overlap check against the source text
 - [x] JSON schemas exist (opt-in `structured: true`). Live finding: gemma4:12b can loop forever under schema-constrained decoding, so the default is no schema + shape example in the prompt + `extractJson` + normalizers + per-stage token caps
 - [ ] Grammar → GBNF export for llama.cpp
-- [ ] Improve first-try lesson quality with small models (few-shot from the user's own pack, smaller steps, per-step generation)
+- [x] Live end-to-end with gemma4:12b on the Git book: pack → outline → lesson → module in ~160 s (1-2 repair rounds per stage)
+- [ ] Lesson quality with small models: prefer the topic pack's kinds over generic concept kinds (rank/require them in the prompt, warn when a lesson uses none), deeper challenges than `set x prop=…`, few-shot from the user's own pack, per-step generation
+- [ ] Flag extra arguments to building blocks (e.g. `connect a b c`)
 - [ ] Persist Studio sessions (resume after reload)
 
 ## Phase 4: `concept` pack (any subject) ✅ core landed in phase 2.5

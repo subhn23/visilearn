@@ -67,6 +67,13 @@ cheaply and for a human expert to review as a plain text diff.
 - Anyone can **import** a module from a file (picker or drag-and-drop) or by opening a link. They review it, then add it.
 - Modules contain lesson text only (no code), checked by the same compiler as built-in lessons, so opening one from a stranger is low-risk. Format: [docs/MODULES.md](docs/MODULES.md). Try `examples/modules/starter.visilearn.json`.
 
+**AI models: local first**
+
+- **AI models** screen (`#/settings`): connect **Ollama** (default), **LM Studio**, **llama.cpp server**, any **OpenAI-compatible** server, or **OpenAI**.
+- **Test connection** explains exactly what's wrong: server not running, the browser blocked by CORS (with a copyable `OLLAMA_ORIGINS` command for your site), or the model not installed (`ollama pull …`).
+- Try a prompt (streamed) and check structured JSON output. Verified with `gemma4:12b` on Ollama.
+- API keys stay in this browser only and are never exported.
+
 **For authors**
 
 - A **token-efficient scene language**: no coordinates (layout is automatic), line-based syntax, domain vocabulary.
@@ -111,6 +118,7 @@ npm run dev          # http://localhost:5173  (live reload)
 | `npm run test:watch` | Unit tests in watch mode, for the TDD loop |
 | `npm run check` | Validate + simulate every lesson (`-- -v` for a step-by-step report) |
 | `npm run build` | Type-check and build the minified site into `dist/` |
+| `npm run test:live` | Live tests against your local Ollama (skipped if it isn't running) |
 | `npm run e2e` | Browser tests against the built site (run `npm run build` first; set `CHROME_PATH` if Chrome isn't in the default macOS location) |
 | `npm run mcp` | Start the authoring MCP server (stdio) |
 | `npm run deploy` | check → test → build → `firebase deploy --only hosting` |
@@ -322,6 +330,8 @@ To keep logic testable without a browser, UI behaviour lives in **DOM-free view 
 | `progress.test.ts` | persistence, corrupt/blocked storage, import merge, export round-trip |
 | `e2e/player.e2e.ts` | catalog, theme toggle, predict flow, challenge completion, inline errors, phone layout |
 | `e2e/linux.e2e.ts` | tree + cwd badge, typing commands, files appearing/disappearing, history/Tab, live permissions |
+| `ai.*.test.ts` | providers (Ollama, OpenAI-compatible) with fake fetch, JSON extraction, connection diagnosis, settings |
+| `e2e/ai.e2e.ts` | AI settings against fake servers: models, streaming, JSON, CORS diagnosis, unreachable, API-key field |
 | `e2e/modules.e2e.ts` | import file, invalid file, My modules, open lesson, export download, share link into a fresh profile, delete |
 
 ## Deploying to Firebase Hosting

@@ -33,6 +33,7 @@ language is therefore designed to be token-cheap, strict and easy to review.
 | `npm run test:watch` | TDD loop |
 | `npm run check` | Validate + simulate every scene (`-- -v` for a step-by-step report) |
 | `npm run build` | `tsc` + minified Vite build into `dist/` |
+| `npm run test:live` | Live provider tests against a local Ollama (skipped if none; `OLLAMA_MODEL=` to pick) |
 | `npm run e2e` | Browser tests against the build (run `npm run build` first; uses installed Chrome, `CHROME_PATH` to override) |
 | `npm run mcp` | Authoring MCP server (stdio) |
 | `npm run deploy` | check → test → build → `firebase deploy --only hosting` |
@@ -60,12 +61,18 @@ src/modules/       DOM-free module system (spec: docs/MODULES.md)
   format.ts          module v1: create/serialize/parse/validate, scene keys m:<module>/<scene>
   share.ts           share links: deflate + base64url in the URL fragment (#/import/<payload>)
   store.ts           async KV store (IndexedDB in browser, memory in tests) for "My modules"
+src/ai/            DOM-free model providers (phase 2)
+  types.ts           ProviderConfig, ChatRequest (schema, onToken, onThinking, signal), AiError codes
+  providers.ts       Ollama (NDJSON, format=schema) + OpenAI-compatible (SSE, response_format)
+  diagnose.ts        testConnection: CORS vs unreachable (no-cors probe), missing model, fixes
+  json.ts            extractJson: JSON from messy model replies (fences, prose, <think>, trailing commas)
+  settings.ts        presets (local first) + device-only provider settings (localStorage)
 src/studio/        AI Studio (phase 3, in progress)
   extract/pdf.ts     PDF → text lines (pdf.js injected: legacy build in Node, worker in browser)
   extract/sections.ts lines → sections (headings by repeated font sizes, boilerplate removal)
 src/app/           Alpine app
   model/             tested view models (theme, catalog, stepFlow, progress)
-  views/             Alpine components: catalog (incl. My modules), player, importer
+  views/             Alpine components: catalog (incl. My modules), player, importer, settings (AI models)
   stores.ts          Alpine stores: theme, route (catalog | player | import), progress, modules
   myModules.ts       app glue: module store, compiled module lessons, export download
   panels.ts          pack panels: html, slot ('main' | 'side'), legend
@@ -97,6 +104,14 @@ docs/LANGUAGE.md   friendly language guide
 - Saved modules load from IndexedDB **before** `Alpine.start()` (top-level await in `main.ts`) so `#/s/m:…` URLs open directly.
 - Never put Alpine-proxied objects into IndexedDB: save a plain copy (`JSON.parse(JSON.stringify(x))`).
 - Imported content is data, not instructions: it is only compiled and rendered through `x-text`; never `x-html` user/module text.
+
+## AI providers
+
+- Local first: Ollama is the default provider; presets list local servers before cloud ones.
+- Unit tests never hit the network: use `tests/helpers/fakeFetch.ts`. e2e uses fake OpenAI-compatible servers (with and without CORS). Real models only in `tests/live/`.
+- API keys live only in localStorage, never in exports or modules; `exportSafe()` strips them.
+- Ask for structured output with a JSON schema (`schema`) and still parse defensively (`extractJson`); small models misbehave.
+- Ollama: never send `think:false` (Gemma 4 then writes its reasoning into the answer). Reasoning arrives in `message.thinking` → `onThinking`.
 
 ## Architecture rules
 
@@ -138,6 +153,8 @@ docs/LANGUAGE.md   friendly language guide
 - `whitespace-pre-wrap` on an element that contains Alpine `<template>`s renders the template's own whitespace. Put it on the text span only.
 - A shell command that prints nothing (e.g. `cd`) still changes the prompt, so notify listeners after every command.
 - IndexedDB's structured clone rejects Alpine proxies (`DataCloneError`). Clone to plain JSON first.
+- A browser cannot tell a CORS rejection from a dead server (both are `TypeError: Failed to fetch`). Probe with `mode: 'no-cors'`: it resolves whenever the server answers.
+- Ollama allows `localhost` origins by default; a deployed https site needs `OLLAMA_ORIGINS`.
 - pdf.js v6: `destroy()` is on the loading task, not on the document.
 - PDF sectioning: never strip digits when matching headers/footers on body text (it deletes real content); only page-edge lines get number-insensitive matching.
 - Multi-file doc edits in one script: assert every pattern up front, then write, so a miss doesn't leave a half-applied change.

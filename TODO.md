@@ -32,15 +32,15 @@ A **module** is a portable bundle of lessons: `{ format, version, id, title, des
 - [x] e2e: import a module file, open a lesson, export it, share link round-trip, invalid file, delete
 - [x] Docs: README, AGENTS.md, MODULES.md · sample module `examples/modules/starter.visilearn.json`
 
-## Phase 2: Model connections (local first)
+## Phase 2: Model connections (local first) ✅ core done
 
-- [ ] Provider interface: `listModels`, `chat` (streaming), structured JSON output, cancel
-- [ ] Ollama provider (default): `/api/tags`, `/api/chat` with `format` (JSON schema)
-- [ ] OpenAI-compatible provider: LM Studio, llama.cpp server, vLLM, OpenRouter, OpenAI
-- [ ] Anthropic provider (browser access header) · Gemini provider
-- [ ] Settings screen: provider list, base URL, model picker, API key (device-only, clearly labelled), **Test connection**
-- [ ] Guided setup for Ollama CORS (`OLLAMA_ORIGINS`) with copyable command and diagnosis of common failures
-- [ ] Tests with fake fetch for every provider (no network in unit tests)
+- [x] Provider interface: `listModels`, `version`, `chat` (streaming), structured JSON output, cancel, classified errors
+- [x] Ollama provider (default): `/api/tags`, `/api/chat` with `format` (JSON schema); reasoning reported separately via `onThinking` (never send `think:false`: Gemma 4 then leaks reasoning into the answer)
+- [x] OpenAI-compatible provider: LM Studio, llama.cpp server, vLLM, OpenRouter, OpenAI (SSE; `json_schema` with `json_object` fallback)
+- [ ] Anthropic provider (browser access header) · Gemini provider (load the claude-api skill before writing the Anthropic one)
+- [x] Settings screen (`#/settings`): provider list, base URL, model picker, API key (device-only, clearly labelled), **Test connection**, try-a-prompt, JSON check
+- [x] Diagnosis: CORS vs unreachable (no-cors probe), missing model (`ollama pull …`), slow first load; copyable `OLLAMA_ORIGINS` fix with the real origin
+- [x] Tests with fake fetch for every provider; e2e against fake servers; live tests vs local Ollama (`npm run test:live`, gemma4:12b ✓)
 - [ ] Optional later: in-browser models (WebGPU) for zero-install local use
 
 ## Phase 3: Studio (AI agent that builds modules from your files)

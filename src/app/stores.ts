@@ -46,6 +46,7 @@ export function registerStores(alpine: Alpine) {
     const h = location.hash;
     const s = /^#\/s\/(.+)$/.exec(h);
     if (s) return { view: 'player', id: decodeURIComponent(s[1]), payload: '' };
+    if (h === '#/settings') return { view: 'settings', id: '', payload: '' };
     const imp = /^#\/import(?:\/(.*))?$/.exec(h);
     if (imp) return { view: 'import', id: '', payload: imp[1] ?? '' };
     return { view: 'catalog', id: '', payload: '' };

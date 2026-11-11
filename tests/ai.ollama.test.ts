@@ -61,3 +61,18 @@ test('chat can be cancelled', async () => {
   const f = fakeFetch({ 'POST /api/chat': () => stream(['{"done":true}\n']) });
   await assert.rejects(createProvider(cfg, f).chat({ messages: [], signal: ctl.signal }), (e: AiError) => e.code === 'aborted');
 });
+
+test('reasoning ("thinking") is reported separately and never mixed into the answer', async () => {
+  const f = fakeFetch({
+    'POST /api/chat': () => stream([
+      '{"message":{"role":"assistant","content":"","thinking":"Let me "},"done":false}\n',
+      '{"message":{"content":"","thinking":"think."},"done":false}\n',
+      '{"message":{"content":"Answer."},"done":true}\n',
+    ]),
+  });
+  const thinking: string[] = [];
+  const r = await createProvider(cfg, f).chat({ messages: [{ role: 'user', content: 'q' }], onThinking: (t) => thinking.push(t) });
+  assert.equal(r.text, 'Answer.');
+  assert.equal(thinking.join(''), 'Let me think.');
+  assert.equal(f.calls[0].body.think, undefined, 'never send think:false: Gemma then writes its reasoning into the answer');
+});

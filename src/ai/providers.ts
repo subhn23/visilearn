@@ -41,6 +41,8 @@ function ollama(cfg: ProviderConfig, f: Fetch): Provider {
     async chat(req) {
       needModel(cfg);
       const t0 = performance.now();
+      // NB: never send think:false. Gemma 4 then writes its reasoning into the answer itself;
+      // left alone, Ollama returns reasoning separately in message.thinking.
       const body: Record<string, unknown> = { model: cfg.model, messages: req.messages, stream: true, options: {} };
       if (req.schema) body.format = req.schema;
       if (req.temperature !== undefined) (body.options as Record<string, unknown>).temperature = req.temperature;
@@ -56,9 +58,10 @@ function ollama(cfg: ProviderConfig, f: Fetch): Provider {
       let usage: ChatResult['usage'];
       await readLines(res, (line) => {
         if (!line.trim()) return;
-        let j: { message?: { content?: string }; done?: boolean; error?: string; prompt_eval_count?: number; eval_count?: number };
+        let j: { message?: { content?: string; thinking?: string }; done?: boolean; error?: string; prompt_eval_count?: number; eval_count?: number };
         try { j = JSON.parse(line); } catch { return; }
         if (j.error) throw new AiError('http', `Ollama: ${j.error}`);
+        if (j.message?.thinking) req.onThinking?.(j.message.thinking);
         const piece = j.message?.content ?? '';
         if (piece) { text += piece; req.onToken?.(piece); }
         if (j.done) { usage = { input: j.prompt_eval_count, output: j.eval_count }; return false; }

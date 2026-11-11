@@ -25,6 +25,8 @@ export interface ChatRequest {
   maxTokens?: number;
   signal?: AbortSignal;
   onToken?: (text: string) => void;
+  /** reasoning text from thinking models (kept out of the answer); useful as a progress signal */
+  onThinking?: (text: string) => void;
 }
 
 export interface ChatResult {

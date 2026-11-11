@@ -23,6 +23,8 @@ export interface ChatRequest {
   schema?: object;
   temperature?: number;
   maxTokens?: number;
+  /** context window to request (Ollama num_ctx); local defaults are often small */
+  numCtx?: number;
   signal?: AbortSignal;
   onToken?: (text: string) => void;
   /** reasoning text from thinking models (kept out of the answer); useful as a progress signal */

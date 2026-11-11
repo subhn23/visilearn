@@ -47,6 +47,7 @@ function ollama(cfg: ProviderConfig, f: Fetch): Provider {
       if (req.schema) body.format = req.schema;
       if (req.temperature !== undefined) (body.options as Record<string, unknown>).temperature = req.temperature;
       if (req.maxTokens !== undefined) (body.options as Record<string, unknown>).num_predict = req.maxTokens;
+      if (req.numCtx !== undefined) (body.options as Record<string, unknown>).num_ctx = req.numCtx;
       let res: Response;
       try {
         res = await send(f, `${base}/api/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: req.signal }, what);

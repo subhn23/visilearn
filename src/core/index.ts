@@ -1,5 +1,5 @@
 export * from './types.ts';
-export { compile } from './compile.ts';
+export { compile, CORE_TOP, CORE_VERBS } from './compile.ts';
 export type { CompileResult } from './compile.ts';
 export { parse, splitArgs, takeIdList } from './parser.ts';
 export { didYouMean } from './suggest.ts';

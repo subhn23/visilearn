@@ -168,8 +168,8 @@ export const linux: PackDef = {
   name: 'linux',
   about: 'Linux command line: files, folders, permissions, pipes.',
   entities: {
-    dir: { tier: 0, swatch: 'mustard', about: 'A directory (folder) holds files and other directories. Paths like /home/asha describe where it lives.' },
-    file: { tier: 1, swatch: 'sky', about: 'A file holds data. Its permissions decide who can read, write or run it.' },
+    dir: { tier: 0, swatch: 'mustard', generatedBy: 'fs', about: 'A directory (folder) holds files and other directories. Paths like /home/asha describe where it lives.' },
+    file: { tier: 1, swatch: 'sky', generatedBy: 'fs', about: 'A file holds data. Its permissions decide who can read, write or run it.' },
   },
   directives: {
     fs: {

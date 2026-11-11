@@ -181,7 +181,9 @@ step "Your turn"
   goal cwd /etc, ran cat, output "localhost"
 ```
 
-The full reference is in **[docs/LANGUAGE.md](docs/LANGUAGE.md)**.
+The friendly guide is **[docs/LANGUAGE.md](docs/LANGUAGE.md)**. The normative, versioned
+specification is **[docs/GRAMMAR.md](docs/GRAMMAR.md)**: a formal EBNF covering the lexical rules,
+the document structure, steps, and every pack. A test keeps it in sync with the engine.
 
 ## Architecture
 
@@ -279,6 +281,11 @@ for a calm reading experience. Body text still stays clearly legible.
 - Reusable utilities: `brut`, `brut-sm`, `grid-paper`, `stripes`. Components: `.btn`, `.chip`, `.field`, `.seg`, `.win-bar` (retro window title bar).
 - The theme follows the OS by default. The header toggle cycles **Auto → Light → Dark**, and a tiny inline script sets the theme before first paint, so the page never flashes the wrong theme.
 
+## Working with AI agents
+
+[AGENTS.md](AGENTS.md) holds the project facts, constraints, conventions and gotchas for any coding
+agent. [CLAUDE.md](CLAUDE.md) imports it and adds Claude Code specifics. Keep both current.
+
 ## Development workflow (TDD)
 
 The project is built test-first:
@@ -294,6 +301,7 @@ To keep logic testable without a browser, UI behaviour lives in **DOM-free view 
 | Suite | Covers |
 |---|---|
 | `engine.test.ts` | parsing, validation messages, simulation, firewall challenge solvability |
+| `grammar.test.ts` | GRAMMAR.md specifies every keyword; its examples compile |
 | `theme.test.ts` | theme resolution, cycling, storage failures |
 | `catalog.test.ts` | track grouping, progress %, status/CTA, colour swatches, broken scenes |
 | `stepFlow.test.ts` | resume step, completion rules, status text |

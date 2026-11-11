@@ -134,6 +134,8 @@ export interface EntityKind {
   props?: Record<string, string>;
   /** UI colour family for this kind: mustard | mint | lilac | peach | sky | rose */
   swatch?: string;
+  /** set when entities of this kind are created by a directive (e.g. fs) and cannot be declared directly */
+  generatedBy?: string;
 }
 
 export interface VerbDef {

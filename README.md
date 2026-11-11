@@ -61,6 +61,12 @@ cheaply and for a human expert to review as a plain text diff.
 - **Progress saved on your device.** You resume at the first unfinished step, and your rule edits are remembered. Export/Import a JSON file to back up or switch browsers.
 - **Light, dark and Auto themes**, a phone-friendly layout, keyboard navigation (← →), a reduced-motion setting and screen-reader labels.
 
+**Modules: share lessons without a server**
+
+- Bundle lessons into a **module**, save it in **My modules** on your device, **export** it as a `.visilearn.json` file, or **share a link** that contains the whole module.
+- Anyone can **import** a module from a file (picker or drag-and-drop) or by opening a link. They review it, then add it.
+- Modules contain lesson text only (no code), checked by the same compiler as built-in lessons, so opening one from a stranger is low-risk. Format: [docs/MODULES.md](docs/MODULES.md). Try `examples/modules/starter.visilearn.json`.
+
 **For authors**
 
 - A **token-efficient scene language**: no coordinates (layout is automatic), line-based syntax, domain vocabulary.
@@ -311,9 +317,12 @@ To keep logic testable without a browser, UI behaviour lives in **DOM-free view 
 | `linux.pack.test.ts` | `fs` language and errors, terminal, goals, events → effects, reset, tree layout |
 | `linux.termInput.test.ts` | terminal history and Tab behaviour |
 | `linux.scenes.test.ts` | every Linux challenge is solvable with its hint |
+| `modules.*.test.ts` | module format & validation, share links, store, module cards, MODULES.md coverage |
+| `studio.sections.test.ts` / `studio.pdf.test.ts` | document sectioning; real PDFs in `pdfs/` (skipped when absent) |
 | `progress.test.ts` | persistence, corrupt/blocked storage, import merge, export round-trip |
 | `e2e/player.e2e.ts` | catalog, theme toggle, predict flow, challenge completion, inline errors, phone layout |
 | `e2e/linux.e2e.ts` | tree + cwd badge, typing commands, files appearing/disappearing, history/Tab, live permissions |
+| `e2e/modules.e2e.ts` | import file, invalid file, My modules, open lesson, export download, share link into a fresh profile, delete |
 
 ## Deploying to Firebase Hosting
 
@@ -343,6 +352,8 @@ There are no server functions and no database.
 5. Write the tests first, then add lessons in `scenes/<name>/` and run `npm run check`.
 
 ## Roadmap
+
+The detailed, checkbox roadmap lives in **[TODO.md](TODO.md)**. Headlines:
 
 - **Packs:** `docker` (layers, containers, ports), `k8s` (reconciler loop, self-healing), `code` (stack/heap traces), `robo` (sense → think → act)
 - **More Linux:** processes (`ps`, `kill`), users and groups, environment variables, `find`

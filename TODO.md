@@ -17,20 +17,20 @@ Every item is built **test-first** (see AGENTS.md). Keep this file current as wo
 
 ---
 
-## Phase 1: Modules (share & import, no AI)
+## Phase 1: Modules (share & import, no AI) ✅
 
 A **module** is a portable bundle of lessons: `{ format, version, id, title, description, author, track, tags, sources, scenes[] }`.
 
-- [ ] Module format v1: create, serialize, parse, validate (shape, size limits, every scene compiles, unique scene ids)
-- [ ] Spec the module format in `docs/MODULES.md` (normative, versioned)
-- [ ] Share links: compress module into the URL fragment (`#/import/<payload>`); round-trip, tamper and oversize handling
-- [ ] Module store: save/list/get/remove on an async key-value backend (IndexedDB in browser, memory in tests)
-- [ ] Scene keys for module lessons (`m:<moduleId>/<sceneId>`) so ids never clash with built-in lessons; progress works per key
-- [ ] Catalog: **My modules** section (cards listing their lessons, progress, open / export / copy link / delete)
-- [ ] Import: file picker + drag-and-drop, and an import-from-link preview screen ("Add to My modules")
-- [ ] Player opens module lessons (`#/s/m:<moduleId>/<sceneId>`)
-- [ ] e2e: import a module file, open a lesson, export it, share link round-trip
-- [ ] Docs: README, AGENTS.md, CLAUDE.md, GRAMMAR.md (if language touched)
+- [x] Module format v1: create, serialize, parse, validate (shape, size limits, every scene compiles, unique scene ids)
+- [x] Spec the module format in `docs/MODULES.md` (normative, versioned, test-enforced)
+- [x] Share links: compress module into the URL fragment (`#/import/<payload>`); round-trip, tamper and oversize handling
+- [x] Module store: save/list/get/remove on an async key-value backend (IndexedDB in browser, memory in tests)
+- [x] Scene keys for module lessons (`m:<moduleId>/<sceneId>`) so ids never clash with built-in lessons; progress works per key
+- [x] Catalog: **My modules** section (cards listing their lessons, progress, open / export / copy link / delete)
+- [x] Import: file picker + drag-and-drop, and an import-from-link preview screen ("Add to My modules")
+- [x] Player opens module lessons (`#/s/m:<moduleId>/<sceneId>`)
+- [x] e2e: import a module file, open a lesson, export it, share link round-trip, invalid file, delete
+- [x] Docs: README, AGENTS.md, MODULES.md · sample module `examples/modules/starter.visilearn.json`
 
 ## Phase 2: Model connections (local first)
 
@@ -45,9 +45,9 @@ A **module** is a portable bundle of lessons: `{ format, version, id, title, des
 
 ## Phase 3: Studio (AI agent that builds modules from your files)
 
-- [~] Read files in the browser: PDF (pdf.js), DOCX (mammoth), Markdown, TXT
-- [~] Split documents into sections (chapters/headings) with page references
-- [x] Tested against the sample books in `pdfs/` (Git, PostgreSQL)
+- [~] Read files: PDF text extraction done (pdf.js, injectable; Node-tested). Still to do: browser worker wiring, DOCX (mammoth), Markdown, TXT
+- [x] Split documents into sections (chapters/headings) with page references, drop headers/footers/TOC, join wrapped titles
+- [x] Tested against the sample books in `pdfs/`: Git (195 pp → 66 chapters), PostgreSQL (74 pp → 34 chapters), < 1 s each
 - [ ] Agent step 1, outline: model proposes lessons per section (structured JSON), user can edit/approve
 - [ ] Agent step 2, draft: structured lesson plan (JSON) → deterministic converter → scene text
 - [ ] Agent step 3, repair loop: compiler diagnostics fed back to the model (max N rounds)

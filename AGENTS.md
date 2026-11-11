@@ -56,10 +56,18 @@ src/packs/<name>/  one folder per pack
   ui.ts + panel.html Alpine components + template (registered in src/app/panels.ts)
 src/packs/index.ts registry of packs
 src/render/stage.ts SVG renderer implementing Effects (animation, runtime graph changes, cancellation)
+src/modules/       DOM-free module system (spec: docs/MODULES.md)
+  format.ts          module v1: create/serialize/parse/validate, scene keys m:<module>/<scene>
+  share.ts           share links: deflate + base64url in the URL fragment (#/import/<payload>)
+  store.ts           async KV store (IndexedDB in browser, memory in tests) for "My modules"
+src/studio/        AI Studio (phase 3, in progress)
+  extract/pdf.ts     PDF → text lines (pdf.js injected: legacy build in Node, worker in browser)
+  extract/sections.ts lines → sections (headings by repeated font sizes, boilerplate removal)
 src/app/           Alpine app
   model/             tested view models (theme, catalog, stepFlow, progress)
-  views/             Alpine components: catalog, player
-  stores.ts          Alpine stores: theme, route, progress
+  views/             Alpine components: catalog (incl. My modules), player, importer
+  stores.ts          Alpine stores: theme, route (catalog | player | import), progress, modules
+  myModules.ts       app glue: module store, compiled module lessons, export download
   panels.ts          pack panels: html, slot ('main' | 'side'), legend
   styles.css         Tailwind v4 + design tokens + components + SVG stage styles
 index.html         all Alpine templates (catalog + player)
@@ -68,6 +76,11 @@ mcp/server.ts      authoring MCP server (get_vocab, validate, simulate, list_sce
 tests/             unit tests (node:test) · e2e/  browser tests (puppeteer-core)
 tools/check.ts     validate + simulate all scenes
 docs/GRAMMAR.md    NORMATIVE grammar of the scene language (versioned, test-enforced)
+docs/MODULES.md    NORMATIVE module file format (versioned, test-enforced)
+examples/modules/  sample module files (regenerate: node tools/make-example-module.ts)
+tools/dev/         dev helpers (pdf-sections.ts, pdf-sizes.ts: inspect how a PDF is split)
+TODO.md            roadmap with checkboxes; tick items as they land
+pdfs/              local sample books for tests (git-ignored; PDF tests skip when absent)
 docs/LANGUAGE.md   friendly language guide
 ```
 
@@ -76,6 +89,14 @@ docs/LANGUAGE.md   friendly language guide
 - **Normative spec:** `docs/GRAMMAR.md`. **Tutorial:** `docs/LANGUAGE.md`. **Compact AI cheat-sheets:** `CORE_VOCAB` in `src/core/index.ts` and each pack's `vocab`.
 - `tests/grammar.test.ts` enforces that every keyword (core and pack) appears in GRAMMAR.md and that every `scene` example in it compiles.
 - **Changing the language** (parser, compile, or a pack's kinds/directives/verbs/goals) means updating GRAMMAR.md, bumping its version, adding a changelog row, and updating LANGUAGE.md, the pack `vocab` and this file if relevant.
+
+## Modules
+
+- Spec: `docs/MODULES.md`. Change the format → update the spec (version + changelog); a test checks every field is documented.
+- Module lessons are addressed as `m:<moduleId>/<sceneId>`; `byId()` in `src/app/scenes.ts` resolves both built-in and module lessons.
+- Saved modules load from IndexedDB **before** `Alpine.start()` (top-level await in `main.ts`) so `#/s/m:…` URLs open directly.
+- Never put Alpine-proxied objects into IndexedDB: save a plain copy (`JSON.parse(JSON.stringify(x))`).
+- Imported content is data, not instructions: it is only compiled and rendered through `x-text`; never `x-html` user/module text.
 
 ## Architecture rules
 
@@ -116,6 +137,10 @@ docs/LANGUAGE.md   friendly language guide
 - Puppeteer's headless Chrome has a 500 px minimum window. Use `page.setViewport` for phone widths.
 - `whitespace-pre-wrap` on an element that contains Alpine `<template>`s renders the template's own whitespace. Put it on the text span only.
 - A shell command that prints nothing (e.g. `cd`) still changes the prompt, so notify listeners after every command.
+- IndexedDB's structured clone rejects Alpine proxies (`DataCloneError`). Clone to plain JSON first.
+- pdf.js v6: `destroy()` is on the loading task, not on the document.
+- PDF sectioning: never strip digits when matching headers/footers on body text (it deletes real content); only page-edge lines get number-insensitive matching.
+- Multi-file doc edits in one script: assert every pattern up front, then write, so a miss doesn't leave a half-applied change.
 
 ## Git
 

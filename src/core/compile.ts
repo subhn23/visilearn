@@ -26,6 +26,13 @@ export function compile(src: string, registry: PackRegistry): CompileResult {
     error,
     warn,
     hasEntity: (id) => byId.has(id),
+    addEntity(e) {
+      if (byId.has(e.id)) { error(e.line, `duplicate id '${e.id}'`); return false; }
+      byId.set(e.id, e);
+      scene.entities.push(e);
+      return true;
+    },
+    addLink(a, b) { scene.links.push([a, b]); },
     entity(id, line) {
       const e = byId.get(id);
       if (!e) error(line, `unknown entity '${id}'${didYouMean(id, byId.keys())}`);
@@ -95,7 +102,6 @@ export function compile(src: string, registry: PackRegistry): CompileResult {
   }
 
   // ---- pass 2: links, directives, unknown statements ------------------------
-  const linked = new Set<string>();
   for (const s of stmts.slice(1)) {
     if (kindOf(s.head)) continue;
     switch (s.head) {
@@ -114,7 +120,6 @@ export function compile(src: string, registry: PackRegistry): CompileResult {
         for (let i = 0; i < ids.length - 1; i++) {
           if (c.entity(ids[i], s.line) && c.entity(ids[i + 1], s.line)) {
             scene.links.push([ids[i], ids[i + 1]]);
-            linked.add(ids[i]); linked.add(ids[i + 1]);
           }
         }
         break;
@@ -130,6 +135,7 @@ export function compile(src: string, registry: PackRegistry): CompileResult {
       }
     }
   }
+  const linked = new Set(scene.links.flat());
   if (scene.links.length) {
     for (const e of scene.entities) if (!linked.has(e.id)) warn(e.line, `'${e.id}' is not linked to anything`);
   }

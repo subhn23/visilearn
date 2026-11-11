@@ -10,6 +10,11 @@ export function resetTransient(rt: Runtime, registry: PackRegistry) {
   for (const name of rt.scene.packs) registry[name].resetTransient?.(rt.state[name]);
 }
 
+/** let packs draw their starting state (after reset, before steps replay) */
+export function present(rt: Runtime, registry: PackRegistry) {
+  for (const name of rt.scene.packs) registry[name].present?.(rt.state[name], rt.fx);
+}
+
 export interface LogEntry { msg: string; tone?: Tone }
 
 /** Effects that draw nothing; optionally records log lines. */
@@ -22,6 +27,10 @@ export function headlessFx(log?: LogEntry[]): Effects {
     setDown: () => {},
     log: (msg, tone) => log?.push({ msg, tone }),
     wait: async () => {},
+    badge: () => {},
+    setSub: () => {},
+    addNode: () => {},
+    removeNode: () => {},
   };
 }
 
@@ -36,6 +45,7 @@ export interface StepReport {
 /** Run every step without animation and report what happens. Used by the MCP server and tests. */
 export async function simulate(scene: Scene, registry: PackRegistry): Promise<StepReport[]> {
   const rt: Runtime = { scene, state: createState(scene, registry), fx: headlessFx(), headless: true, ask: async () => {} };
+  present(rt, registry);
   const out: StepReport[] = [];
   for (const [index, step] of scene.steps.entries()) {
     const log: LogEntry[] = [];

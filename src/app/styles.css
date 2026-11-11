@@ -180,6 +180,12 @@
 .node.flash-bad .plate { animation: flash-bad .9s; }
 .node.flash-bad .body { animation: shake .35s; }
 .node.flash-warn .plate { animation: flash-warn .9s; }
+.node.flash-info .plate { animation: flash-info .7s; }
+.node.appear .body { animation: appear .45s ease-out; transform-box: fill-box; transform-origin: center; }
+.badge rect { fill: var(--ink); }
+.badge .badge-shadow { fill: var(--shadow); opacity: .5; }
+.badge .tail { fill: var(--ink); }
+.badge text { fill: var(--paper); font-size: 10.5px; font-weight: 700; text-anchor: middle; letter-spacing: .04em; }
 .swatch-mustard { fill: var(--mustard); } .swatch-mint { fill: var(--mint); } .swatch-lilac { fill: var(--lilac); }
 .swatch-peach { fill: var(--peach); } .swatch-sky { fill: var(--sky); } .swatch-rose { fill: var(--rose); }
 
@@ -204,6 +210,8 @@
 @keyframes flash-ok { 30% { fill: var(--ok); } }
 @keyframes flash-bad { 30% { fill: var(--bad); } }
 @keyframes flash-warn { 30% { fill: var(--warn); } }
+@keyframes flash-info { 35% { fill: var(--card); } }
+@keyframes appear { from { transform: scale(.3); opacity: 0; } }
 @keyframes pop { to { transform: scale(2.2); opacity: 0; } }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes shake { 25% { translate: -4px 0; } 75% { translate: 4px 0; } }

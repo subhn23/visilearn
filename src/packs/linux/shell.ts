@@ -74,7 +74,7 @@ function flags(args: string[]): { f: Set<string>; rest: string[] } {
   return { f, rest };
 }
 
-function suggest(cmd: string): string {
+export function suggest(cmd: string): string {
   const sorted = (s: string) => [...s].sort().join('');
   const hit = COMMANDS.find((c) => (c.length === cmd.length && sorted(c) === sorted(cmd)) || (Math.abs(c.length - cmd.length) <= 1 && c.startsWith(cmd.slice(0, -1)) && cmd.length > 1));
   return hit ? ` (did you mean '${hit}'?)` : '';

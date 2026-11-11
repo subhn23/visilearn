@@ -92,6 +92,14 @@ export interface Effects {
   setDown(id: string, down: boolean): void;
   log(msg: string, tone?: Tone): void;
   wait(ms: number): Promise<void>;
+  /** persistent tag on a node (e.g. "you are here"); null removes it */
+  badge(id: string, text: string | null): void;
+  /** change a node's secondary label (e.g. new permissions) */
+  setSub(id: string, text: string): void;
+  /** graph changes at runtime (e.g. a file was created); the stage re-lays out */
+  addNode(e: Entity, linkTo?: string): void;
+  /** removes the node and everything whose id starts with `${id}/` */
+  removeNode(id: string): void;
 }
 
 export interface Runtime {
@@ -111,6 +119,9 @@ export interface CompileCtx {
   /** look up an entity, reporting a helpful error (with suggestion) when missing */
   entity(id: string, line: number): Entity | undefined;
   hasEntity(id: string): boolean;
+  /** packs may generate entities (e.g. a filesystem tree); returns false on duplicate id */
+  addEntity(e: Entity): boolean;
+  addLink(a: string, b: string): void;
 }
 
 export interface EntityKind {
@@ -150,6 +161,10 @@ export interface PackDef {
   initState?(scene: Scene): unknown;
   /** clear state that steps create (e.g. failed nodes) while keeping learner edits */
   resetTransient?(state: any): void;
+  /** draw state that exists before any step runs (called after reset) */
+  present?(state: any, fx: Effects): void;
+  /** extra lines for the inspector when a node is clicked */
+  describe?(state: any, id: string): string[] | null;
   exportUser?(state: any): unknown;
   importUser?(state: any, data: unknown): void;
   /** compact cheat-sheet for AI authors; keep it short, it is sent as tokens */

@@ -3,7 +3,7 @@ export { compile } from './compile.ts';
 export type { CompileResult } from './compile.ts';
 export { parse, splitArgs, takeIdList } from './parser.ts';
 export { didYouMean } from './suggest.ts';
-export { createState, resetTransient, headlessFx, simulate } from './runtime.ts';
+export { createState, resetTransient, present, headlessFx, simulate } from './runtime.ts';
 export type { LogEntry, StepReport } from './runtime.ts';
 export { layoutScene } from './layout.ts';
 export type { Layout, Pos } from './layout.ts';

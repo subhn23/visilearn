@@ -1,0 +1,29 @@
+{
+  "format": "visilearn.module",
+  "version": 1,
+  "id": "visilearn-starter-sample",
+  "title": "Starter: networks & the shell",
+  "description": "A sample module bundling two built-in lessons. Import it to try modules.",
+  "author": "visilearn",
+  "track": "net",
+  "tags": [
+    "sample",
+    "starter"
+  ],
+  "sources": [
+    {
+      "title": "visilearn built-in lessons",
+      "license": "same as the project"
+    }
+  ],
+  "created": "2026-11-11T00:00:00.000Z",
+  "updated": "2026-11-11T00:00:00.000Z",
+  "scenes": [
+    {
+      "source": "scene net.ports \"Ports: doors on a server\"\nabout \"One server can run many services. Each one listens on its own port number.\"\nuse net\n\nhost you 10.0.0.5 label=\"You\"\nserver srv 10.0.0.80 port=80,443,22 label=\"Server\"\n\nlink you srv\n\nstep \"Each service has a door number\"\n  note srv \"Listening: 80 (HTTP), 443 (HTTPS), 22 (SSH)\"\n  you send srv:80\n  you send srv:443\n\nstep \"Knocking on a closed door\"\n  ask \"Nothing listens on port 3306 (MySQL). What will the server do?\" \"Accept it anyway\" \"Refuse the connection\" \"Forward it\" answer=2\n  you send srv:3306\n\nstep \"Quick check\"\n  ask \"Which port does HTTPS use by default?\" 22|80|443 answer=443\n  ask \"Which port does SSH use by default?\" 21|22|23 answer=22\n"
+    },
+    {
+      "source": "scene linux.navigate \"Finding your way around\"\nabout \"The Linux filesystem is one big tree. pwd tells you where you are, ls looks around, cd moves.\"\nuse linux\n\nfs as=asha\n  home/\n    asha/\n      notes.txt \"buy milk\"\n      projects/\n        app.py \"print('hello')\"\n        README.md \"My first app\"\n  etc/\n    hosts \"127.0.0.1 localhost\"\n  tmp/\n\nstep \"Everything starts at /\"\n  say \"Linux keeps every file in a single tree. The very top is called root and is written as /.\"\n  highlight /\n  note / \"root: the top of the tree\"\n\nstep \"Where am I?\"\n  say \"Your terminal is always inside one folder. pwd (print working directory) shows its full path.\"\n  run pwd\n  note /home/asha \"your home folder\"\n\nstep \"Look around\"\n  ask \"What will ls show right now?\" \"Every file on the computer\" \"What is inside /home/asha\" \"Only files, never folders\" answer=2\n  run ls\n\nstep \"Move with cd\"\n  run \"cd projects\"\n  run ls\n  say \"Watch the badge move. projects is a relative path; /home/asha/projects is the absolute path to the same place.\"\n\nstep \"Go back up\"\n  ask \"Which command goes up one level, back to /home/asha?\" \"cd ..\" \"cd /\" \"cd up\" answer=1\n  run \"cd ..\"\n\nstep \"Your turn\"\n  say \"Use the terminal below: go to /etc and print the hosts file.\"\n  hint \"cd /etc   then   cat hosts\"\n  goal cwd /etc, ran cat, output \"localhost\"\n"
+    }
+  ]
+}

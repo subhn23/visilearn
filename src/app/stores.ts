@@ -1,5 +1,8 @@
 import type { Alpine } from 'alpinejs';
+import type { ModuleCheck } from '../modules/format.ts';
+import type { StoredModule } from '../modules/store.ts';
 import { createProgressStore } from './model/progress.ts';
+import { loadModules, myModules } from './myModules.ts';
 import { nextPref, readPref, resolveTheme, writePref } from './model/theme.ts';
 import type { ThemePref } from './model/theme.ts';
 
@@ -40,8 +43,12 @@ export function registerStores(alpine: Alpine) {
   alpine.store('theme', theme);
 
   const parse = () => {
-    const m = /^#\/s\/(.+)$/.exec(location.hash);
-    return m ? { view: 'player', id: decodeURIComponent(m[1]) } : { view: 'catalog', id: '' };
+    const h = location.hash;
+    const s = /^#\/s\/(.+)$/.exec(h);
+    if (s) return { view: 'player', id: decodeURIComponent(s[1]), payload: '' };
+    const imp = /^#\/import(?:\/(.*))?$/.exec(h);
+    if (imp) return { view: 'import', id: '', payload: imp[1] ?? '' };
+    return { view: 'catalog', id: '', payload: '' };
   };
   alpine.store('route', {
     ...parse(),
@@ -52,6 +59,18 @@ export function registerStores(alpine: Alpine) {
       });
     },
   });
+
+  /** My modules (device storage) and a module waiting on the import screen */
+  const mods: {
+    list: StoredModule[];
+    pending: ModuleCheck | null;
+    reload(): Promise<void>;
+  } = {
+    list: myModules(),
+    pending: null,
+    async reload() { this.list = await loadModules(); },
+  };
+  alpine.store('modules', mods);
 
   /** bumped whenever progress changes so views can recompute */
   const counter: { version: number; bump(): void } = { version: 0, bump() { this.version++; } };

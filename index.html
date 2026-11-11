@@ -38,7 +38,11 @@
     <main x-data>
       <!-- ================= CATALOG ================= -->
       <template x-if="$store.route.view === 'catalog'">
-        <div x-data="catalog" x-init="document.title = 'visilearn'" class="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6">
+        <div x-data="catalog" x-init="document.title = 'visilearn'" class="relative mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6"
+          @dragover.prevent="dragging = true" @dragleave.self="dragging = false" @drop.prevent="dropModule($event)">
+          <div x-show="dragging" x-cloak class="pointer-events-none fixed inset-4 z-40 grid place-items-center rounded-2xl border-4 border-dashed border-stroke bg-paper/85">
+            <p class="font-mono text-xl font-bold">Drop a module file to import it</p>
+          </div>
 
           <!-- hero -->
           <section class="brut grid-paper relative overflow-hidden">
@@ -75,6 +79,65 @@
             <div class="brut bg-mustard p-4 text-on-swatch"><div class="font-mono text-3xl font-bold sm:text-4xl" x-text="String(model.stats.total).padStart(2, '0')"></div><div class="label-mono !text-on-swatch/75">Topics</div></div>
             <div class="brut bg-lilac p-4 text-on-swatch"><div class="font-mono text-3xl font-bold sm:text-4xl" x-text="String(model.stats.started).padStart(2, '0')"></div><div class="label-mono !text-on-swatch/75">In progress</div></div>
             <div class="brut bg-mint p-4 text-on-swatch"><div class="font-mono text-3xl font-bold sm:text-4xl" x-text="String(model.stats.done).padStart(2, '0')"></div><div class="label-mono !text-on-swatch/75">Completed</div></div>
+          </section>
+
+          <!-- my modules -->
+          <section id="my-modules" class="mt-12 scroll-mt-24" aria-labelledby="my-modules-title">
+            <div class="mb-4 flex flex-wrap items-center gap-3">
+              <h2 id="my-modules-title" class="font-mono text-2xl font-bold">My modules</h2>
+              <span class="chip bg-card text-ink-soft" x-text="moduleCards.length + (moduleCards.length === 1 ? ' module' : ' modules')"></span>
+              <span class="h-0.5 min-w-8 flex-1 bg-stroke/30"></span>
+              <label class="btn btn-sm">Import module<input type="file" accept=".json,application/json" class="sr-only" aria-label="Import module file" @change="pickModule($event)"></label>
+            </div>
+            <template x-if="!moduleCards.length">
+              <div class="rounded-xl border-2 border-dashed border-stroke/60 p-6 text-center text-ink-soft">
+                <p class="font-mono font-bold text-ink">No modules yet</p>
+                <p class="mt-1 text-sm">Open a share link, use <b>Import module</b>, or drop a <span class="font-mono">.visilearn.json</span> file anywhere on this page.</p>
+              </div>
+            </template>
+            <div class="grid gap-5 lg:grid-cols-2">
+              <template x-for="m in moduleCards" :key="m.id">
+                <article class="brut flex flex-col overflow-hidden bg-card">
+                  <header class="win-bar text-on-swatch" :class="'bg-' + m.swatch">
+                    <span class="win-dots"><i class="bg-card"></i></span>
+                    <span class="flex-1 truncate" x-text="m.id + '.visilearn.json'"></span>
+                    <span class="chip border-on-swatch/60 bg-card/60" x-text="m.pct + '%'"></span>
+                  </header>
+                  <div class="flex flex-1 flex-col gap-3 p-4">
+                    <div>
+                      <h3 class="font-mono text-lg font-bold" x-text="m.title"></h3>
+                      <p class="text-sm text-ink-soft" x-show="m.author" x-text="'by ' + m.author"></p>
+                      <p class="mt-1 text-sm" x-show="m.description" x-text="m.description"></p>
+                      <p class="mt-1 font-mono text-xs text-ink-soft" x-show="m.sources.length" x-text="'source: ' + m.sources.join('; ')"></p>
+                    </div>
+                    <ol class="flex flex-col gap-1.5">
+                      <template x-for="(l, i) in m.lessons" :key="l.key">
+                        <li><a :href="'#/s/' + l.key" class="brut-flat flex items-center gap-3 bg-card-2 px-3 py-2 text-sm hover:bg-card">
+                          <span class="font-mono text-xs font-bold text-ink-soft" x-text="String(i + 1).padStart(2, '0')"></span>
+                          <span class="flex-1 font-medium" x-text="l.title"></span>
+                          <span class="font-mono text-xs text-ink-soft" x-text="l.pct === 100 ? 'done ✓' : l.steps + ' steps'"></span>
+                        </a></li>
+                      </template>
+                    </ol>
+                    <template x-if="m.errors.length">
+                      <ul class="ml-4 list-disc font-mono text-xs text-bad"><template x-for="e in m.errors.slice(0, 4)"><li x-text="e"></li></template></ul>
+                    </template>
+                    <div class="mt-auto flex flex-wrap gap-2 pt-1">
+                      <button class="btn btn-sm" @click="exportModule(m.id)">Export</button>
+                      <button class="btn btn-sm" @click="shareModule(m.id)">Share link</button>
+                      <button class="btn btn-sm ml-auto" :class="deleteArmed === m.id && '!bg-rose text-on-swatch'" @click="deleteModule(m.id)"
+                        x-text="deleteArmed === m.id ? 'Click again to delete' : 'Delete'"></button>
+                    </div>
+                    <template x-if="share.id === m.id">
+                      <div class="brut-flat bg-card-2 p-3">
+                        <p class="text-sm" x-text="share.note" aria-live="polite"></p>
+                        <input class="field mt-2" readonly aria-label="Share link" x-show="share.url" :value="share.url" @focus="$el.select()">
+                      </div>
+                    </template>
+                  </div>
+                </article>
+              </template>
+            </div>
           </section>
 
           <!-- how it works -->
@@ -167,6 +230,71 @@
             </div>
             <p class="w-full font-mono text-xs text-ink-soft" x-show="message" x-text="message" aria-live="polite"></p>
           </footer>
+        </div>
+      </template>
+
+      <!-- ================= IMPORT ================= -->
+      <template x-if="$store.route.view === 'import'">
+        <div x-data="importer($store.route.payload)" class="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:px-6">
+          <div class="mb-5 flex items-center gap-3">
+            <a href="#/" class="btn btn-icon" aria-label="Back to all topics">←</a>
+            <h1 class="font-mono text-2xl font-bold">Import a module</h1>
+          </div>
+          <p x-show="loading" class="font-mono text-ink-soft">Reading module…</p>
+          <template x-if="!loading && !check">
+            <div class="brut bg-card p-6">
+              <p class="font-mono font-bold">Nothing to import.</p>
+              <p class="mt-1 text-sm text-ink-soft">Open a share link, or use <b>Import module</b> on the home page.</p>
+            </div>
+          </template>
+          <template x-if="!loading && check">
+            <section class="brut overflow-hidden bg-card">
+              <header class="win-bar text-on-swatch" :class="check.module ? 'bg-mint' : 'bg-rose'">
+                <span class="win-dots"><i class="bg-card"></i></span>
+                <span class="flex-1 truncate" x-text="check.module ? check.module.id + '.visilearn.json' : 'module'"></span>
+                <span class="chip border-on-swatch/60 bg-card/60" x-text="check.module ? 'valid' : 'has problems'"></span>
+              </header>
+              <div class="p-5">
+                <template x-if="check.module">
+                  <div>
+                    <h2 class="font-mono text-xl font-bold" x-text="check.module.title"></h2>
+                    <p class="text-sm text-ink-soft" x-show="check.module.author" x-text="'by ' + check.module.author"></p>
+                    <p class="mt-2" x-show="check.module.description" x-text="check.module.description"></p>
+                    <p class="mt-1 font-mono text-xs text-ink-soft" x-show="check.module.sources.length"
+                      x-text="'source: ' + check.module.sources.map((s) => s.pages ? s.title + ', ' + s.pages : s.title).join('; ')"></p>
+                    <div class="label-mono mt-4 mb-2" x-text="lessons.length + (lessons.length === 1 ? ' lesson' : ' lessons')"></div>
+                    <ol class="flex flex-col gap-1.5">
+                      <template x-for="(l, i) in lessons" :key="l.id">
+                        <li class="brut-flat flex items-center gap-3 bg-card-2 px-3 py-2 text-sm">
+                          <span class="font-mono text-xs font-bold text-ink-soft" x-text="String(i + 1).padStart(2, '0')"></span>
+                          <span class="flex-1 font-medium" x-text="l.title"></span>
+                          <span class="font-mono text-xs text-ink-soft" x-text="l.steps + ' steps'"></span>
+                        </li>
+                      </template>
+                    </ol>
+                  </div>
+                </template>
+                <template x-if="check.errors.length">
+                  <div class="mt-2">
+                    <p class="font-mono font-bold text-bad">This module can't be imported:</p>
+                    <ul class="mt-2 ml-4 list-disc font-mono text-xs text-bad"><template x-for="e in check.errors.slice(0, 12)"><li x-text="e"></li></template></ul>
+                  </div>
+                </template>
+                <template x-if="check.warnings.length">
+                  <details class="mt-3 text-sm"><summary class="cursor-pointer font-mono" x-text="check.warnings.length + ' warning(s)'"></summary>
+                    <ul class="mt-2 ml-4 list-disc font-mono text-xs text-warn"><template x-for="w in check.warnings.slice(0, 12)"><li x-text="w"></li></template></ul>
+                  </details>
+                </template>
+                <p class="mt-4 text-sm text-ink-soft" x-show="exists">You already have this module. Adding it again replaces your copy (your progress is kept).</p>
+                <p class="mt-2 font-mono text-sm text-bad" x-show="error" x-text="error"></p>
+                <p class="mt-4 text-xs text-ink-soft">Modules contain lesson text only (no code), checked by the same compiler as built-in lessons.</p>
+                <div class="mt-4 flex gap-2">
+                  <button class="btn btn-primary" @click="add()" :disabled="!check.module || saving">Add to My modules</button>
+                  <a href="#/" class="btn">Cancel</a>
+                </div>
+              </div>
+            </section>
+          </template>
         </div>
       </template>
 

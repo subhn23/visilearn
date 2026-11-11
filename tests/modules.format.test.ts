@@ -81,3 +81,11 @@ test('scene keys namespace module lessons', () => {
   assert.deepEqual(splitSceneKey('m:starter-pack-abc123/net.hello'), { moduleId: 'starter-pack-abc123', sceneId: 'net.hello' });
   assert.equal(splitSceneKey('net.firewall'), null);
 });
+
+test('docs/MODULES.md specifies the current format version and every field', async () => {
+  const { readFileSync } = await import('node:fs');
+  const doc = readFileSync(new URL('../docs/MODULES.md', import.meta.url), 'utf8');
+  assert.match(doc, /Module format version: 1\b/);
+  for (const key of Object.keys(make())) assert.ok(doc.includes(`\`${key}\``), `MODULES.md is missing field \`${key}\``);
+  assert.match(doc, /#\/import\//, 'share-link scheme documented');
+});

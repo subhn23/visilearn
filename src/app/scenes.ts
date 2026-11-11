@@ -2,6 +2,7 @@ import { compile } from '../core/compile.ts';
 import type { Diag, Scene } from '../core/types.ts';
 import { packs } from '../packs/index.ts';
 import type { CatalogEntry } from './model/catalog.ts';
+import { moduleScene } from './myModules.ts';
 
 // Scenes are plain text files bundled at build time: static hosting, no backend.
 const files = import.meta.glob('/scenes/**/*.scene', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
@@ -16,7 +17,8 @@ export const entries: SceneEntry[] = Object.entries(files)
   .sort(([a], [b]) => a.localeCompare(b))
   .map(([file, source]) => ({ file, ...compile(source, packs) }));
 
-export const byId = (id: string) => entries.find((e) => e.scene?.id === id)?.scene ?? null;
+/** Built-in lesson by id, or a module lesson by its key (m:<module>/<scene>). */
+export const byId = (id: string) => (id.startsWith('m:') ? moduleScene(id) : entries.find((e) => e.scene?.id === id)?.scene ?? null);
 
 export const catalogEntries = (): CatalogEntry[] =>
   entries.map((e) => ({

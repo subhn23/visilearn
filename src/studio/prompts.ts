@@ -51,7 +51,9 @@ Rules:
   2. a step with an "ask" (a prediction with 2-4 options, answer = number of the correct option, 1-based)
      followed by the action that reveals the answer,
   3. a final "Your turn" step with 1-3 buttons whose actions make that step's goals true.
-     The goals must be false before the buttons are pressed.
+     The goals must be false before the buttons are pressed. Only this step has goals.
+     Buttons must CHANGE something the goals check: add, set, connect, point or a pack macro
+     (flash and highlight change nothing).
 - Steps without a question use {"question":"","options":[],"answer":1}.
 - Explain in your own words. Never copy sentences from the source.
 

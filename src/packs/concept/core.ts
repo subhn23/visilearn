@@ -43,7 +43,7 @@ function primitives(): Record<string, VerbDef> {
         const [kindTok, idTok, toTok, parentTok] = pos;
         if (!kindTok || !idTok) { c.error(s.line, `usage: ${this.usage}`); return null; }
         const k = c.kindOf(kindTok.v);
-        if (!k) { c.error(s.line, `unknown kind '${kindTok.v}'`); return null; }
+        if (!k) { c.error(s.line, `unknown kind '${kindTok.v}': the word after add must be a kind (usage: ${this.usage})`); return null; }
         if (toTok && toTok.v !== 'to') { c.error(s.line, `expected 'to PARENT' after the id, got '${toTok.v}'`); return null; }
         const parent = parentTok?.v;
         if (toTok && !parent) { c.error(s.line, 'add … to needs a parent id'); return null; }

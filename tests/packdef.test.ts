@@ -173,3 +173,33 @@ step "s"
   const y = (id: string) => pos.get(id)!.y;
   assert.ok(y('here') < y('main') && y('main') < y('c3'), 'chain stacks in order: HEAD over main over c3');
 });
+
+test('macro bodies are shape-checked at pack time (found live with gemma4)', () => {
+  const r = compilePack(`pack gitx "G"
+kind repository icon=folder
+kind remote icon=server
+macro clone REMOTE REPOSITORY
+  add REPOSITORY to REMOTE
+macro push BRANCH REMOTE
+  flow BRANCH to REMOTE
+macro tag X
+  set X
+macro ok REPO REMOTE
+  add repository REPO to REMOTE
+  connect REPO REMOTE`, builtinPacks);
+  const msgs = r.diags.map((d) => `L${d.line} ${d.msg}`).join('\n');
+  assert.match(msgs, /L5 .*add needs a KIND and an ID before 'to'/);
+  assert.match(msgs, /L7 .*flow takes ids only; remove 'to'/);
+  assert.match(msgs, /L9 .*set needs ID prop=value/);
+  assert.doesNotMatch(msgs, /L1[12] /, 'well-formed macro lines pass');
+});
+
+test('errors that come from inside a macro say which macro', () => {
+  const { pack } = compilePack(`pack gity "G"
+kind repository icon=folder
+macro make R
+  add repository R to nowhere`, builtinPacks);
+  const registry = withPacks(builtinPacks, [pack!]);
+  const r = compile(`scene gity.x "X"\nuse gity\nrepository a\nstep "s"\n  make b`, registry);
+  assert.match(r.diags.map((d) => `L${d.line} ${d.msg}`).join('\n'), /L5 in macro make: unknown entity 'nowhere'/);
+});

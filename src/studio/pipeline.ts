@@ -152,6 +152,14 @@ export async function generateOutline(deps: StudioDeps, input: { topic: string; 
 
 // ---- 3. lessons ----------------------------------------------------------------------
 
+/**
+ * Deterministic repairs that would otherwise cost a model round (each ~25 s locally):
+ * goals only make sense on challenge steps (with buttons), so goals elsewhere are dropped.
+ */
+export function autoFix(l: LessonSpec): LessonSpec {
+  return { ...l, steps: l.steps.map((s) => (s.buttons.length ? s : { ...s, goals: [] })) };
+}
+
 /** headless check: plain goals must be reachable; button challenges must start unsolved and be solvable */
 export async function verifyLesson(scene: Scene, registry: PackRegistry): Promise<string[]> {
   const problems: string[] = [];
@@ -173,7 +181,11 @@ export async function verifyLesson(scene: Scene, registry: PackRegistry): Promis
       for (const b of step.buttons) await b.action.run(rt);
     }
     const unmet = step.goals.filter((g) => !g.check(rt)).map((g) => g.label);
-    if (unmet.length) problems.push(`Step ${i + 1}: ${step.buttons.length ? 'the challenge cannot be solved' : 'goals are never met'}: still unmet after ${step.buttons.length ? 'pressing every button' : 'its actions'}: ${unmet.join('; ')}.`);
+    if (unmet.length) {
+      problems.push(step.buttons.length
+        ? `Step ${i + 1}: the challenge cannot be solved: still unmet after pressing every button: ${unmet.join('; ')}. Buttons must change what the goals check (add, set, connect, point or a pack macro); flash and highlight change nothing.`
+        : `Step ${i + 1}: goals are never met after its actions: ${unmet.join('; ')}.`);
+    }
   }
   if (!interactive) problems.push('The lesson needs an ask (prediction) or a final step with buttons and goals.');
   return problems;
@@ -185,6 +197,8 @@ export async function generateLesson(deps: StudioDeps, input: { item: OutlineIte
   const names = input.packs.map((p) => p.name);
   const needsConcept = !names.length || input.packs.some((p) => p.stateKey);
   const vocab = [...input.packs.map((p) => p.vocab), ...(needsConcept && !names.includes('concept') ? [CONCEPT_VOCAB] : [])].join('\n\n');
+  // the prompt advertises the generic concept kinds, so the lesson must be allowed to use them (found live)
+  if (needsConcept && !names.includes('concept')) names.push('concept');
   deps.onEvent?.({ type: 'status', message: `Writing lesson “${input.item.title}”…` });
   const first: ChatMessage[] = [
     { role: 'system', content: lessonSystem(vocab) },
@@ -202,8 +216,9 @@ export async function generateLesson(deps: StudioDeps, input: { item: OutlineIte
       ].join('\n'),
     },
   ];
-  const r = await withRepair<Scene>(deps, first, LESSON_SCHEMA, MAX_TOKENS.lesson, 'the lesson', async (json: unknown) => {
-    const text = lessonToScene(normalizeLesson(json), names);
+  const lessonDeps = { ...deps, maxRepairs: deps.maxRepairs ?? 4 };
+  const r = await withRepair<Scene>(lessonDeps, first, LESSON_SCHEMA, MAX_TOKENS.lesson, 'the lesson', async (json: unknown) => {
+    const text = lessonToScene(autoFix(normalizeLesson(json)), names);
     const c = compile(text, registry);
     const errors = c.diags.filter((d) => d.severity === 'error').map((d) => `L${d.line} ${d.msg}`);
     if (!c.scene) return { value: null, text, errors };

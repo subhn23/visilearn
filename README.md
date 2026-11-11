@@ -74,6 +74,14 @@ cheaply and for a human expert to review as a plain text diff.
 - Try a prompt (streamed) and check structured JSON output. Verified with `gemma4:12b` on Ollama.
 - API keys stay in this browser only and are never exported.
 
+**Studio: turn your own files into a module (local AI first)**
+
+- Open **Studio**, pick PDFs, Markdown or text files (read in your browser, never uploaded), and tick the chapters you want.
+- The AI designs a **topic pack** (or you reuse a built-in one), plans the lessons (you edit the plan), and writes each lesson.
+- Every draft is compiled and **simulated**: a challenge that can't be solved, or is solved before the learner acts, is sent back to the model with the exact errors until it's fixed.
+- Review, edit the source with live validation, **Save & preview**, then share it like any module. Sources and page ranges are recorded.
+- Works with Ollama out of the box. It was tested live with `gemma4:12b` on the sample Git book, and the tests guard against the quirks we found in small local models.
+
 **Open pack system: new topics without code**
 
 - Topic vocabularies (*packs*) are not a fixed list. Besides the built-in packs, a **data pack** written in the pack definition language adds kinds of things (with icons, colours and properties) and **macros**. For example, a `git` pack provides `commit c3 c2 main` and `merge m1 c2 f1 main`.
@@ -334,6 +342,7 @@ To keep logic testable without a browser, UI behaviour lives in **DOM-free view 
 | `linux.termInput.test.ts` | terminal history and Tab behaviour |
 | `linux.scenes.test.ts` | every Linux challenge is solvable with its hint |
 | `packdef.test.ts` | data packs: definitions, errors, macros, hidden entities, buttons, concept goals, label layout |
+| `studio.*.test.ts` | converters, normalizers (from real model output), pipeline with a scripted model, Markdown/PDF sectioning |
 | `examples.test.ts` | example modules are valid and their button challenges are solvable |
 | `modules.*.test.ts` | module format & validation, share links, store, module cards, MODULES.md coverage |
 | `studio.sections.test.ts` / `studio.pdf.test.ts` | document sectioning; real PDFs in `pdfs/` (skipped when absent) |
@@ -342,6 +351,7 @@ To keep logic testable without a browser, UI behaviour lives in **DOM-free view 
 | `e2e/linux.e2e.ts` | tree + cwd badge, typing commands, files appearing/disappearing, history/Tab, live permissions |
 | `ai.*.test.ts` | providers (Ollama, OpenAI-compatible) with fake fetch, JSON extraction, connection diagnosis, settings |
 | `e2e/ai.e2e.ts` | AI settings against fake servers: models, streaming, JSON, CORS diagnosis, unreachable, API-key field |
+| `e2e/studio.e2e.ts` | Studio against a fake model: file → pack → plan → lessons → edit → save → play |
 | `e2e/modules.e2e.ts` | import file, invalid file, My modules, open lesson, export download, share link into a fresh profile, delete |
 
 ## Deploying to Firebase Hosting

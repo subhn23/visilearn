@@ -133,6 +133,8 @@ export interface CompileCtx {
   kindOf(kind: string): { pack: string; def: EntityKind } | null;
   /** compile one action line (core action or pack verb) — used by macros */
   compileAction(head: string, args: Token[], line: number): Action | null;
+  /** run fn with every error/warning message prefixed (e.g. "in macro clone: ") */
+  withPrefix<T>(prefix: string, fn: () => T): T;
 }
 
 export interface EntityKind {

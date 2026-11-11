@@ -60,20 +60,23 @@ Packs must be addable on the go (by the Studio, by modules, later by the marketp
 - [ ] Pack versioning + namespacing for the marketplace (`author/name@version`), conflict handling across modules
 - [ ] Later: sandboxed code packs (iframe/worker, no network/storage) for reviewed marketplace simulators
 
-## Phase 3: Studio (AI agent that builds modules, and new packs, from your files)
+## Phase 3: Studio (AI agent that builds modules, and new packs, from your files) ✅ first version
 
-- [~] Read files: PDF text extraction done (pdf.js, injectable; Node-tested). Still to do: browser worker wiring, DOCX (mammoth), Markdown, TXT
+- [x] Read files in the browser: PDF (lazy pdf.js + worker), Markdown (headings → sections), TXT · [ ] DOCX (mammoth)
 - [x] Split documents into sections (chapters/headings) with page references, drop headers/footers/TOC, join wrapped titles
 - [x] Tested against the sample books in `pdfs/`: Git (195 pp → 66 chapters), PostgreSQL (74 pp → 34 chapters), < 1 s each
-- [ ] Agent step 0, pack: model proposes a data pack for the topic (kinds, icons, macros) as structured JSON → pack text → `compilePack` repair loop; reuse built-in packs when they fit
-- [ ] Agent step 1, outline: model proposes lessons per section (structured JSON), user can edit/approve
-- [ ] Agent step 2, draft: structured lesson plan (JSON) → deterministic converter → scene text
-- [ ] Agent step 3, repair loop: compiler diagnostics fed back to the model (max N rounds)
-- [ ] Agent step 4, verify: headless simulate; challenges must be unmet at start
-- [ ] Live preview in the player while generating; edit source, regenerate one lesson
-- [ ] Save as a module (author, sources with pages, licence note)
-- [ ] Guardrails: paraphrase, never copy long passages; record source pages for reviewers
-- [ ] Grammar → GBNF / JSON schema export for constrained decoding (llama.cpp / Ollama `format`)
+- [x] Agent step 0, pack: JSON → normalize → pack text → `compilePack` repair loop; or reuse a built-in pack (user's choice)
+- [x] Agent step 1, outline: model proposes lessons with section refs; user edits titles/goals and picks which to keep
+- [x] Agent step 2, draft: lesson JSON → normalize → deterministic converter → scene text (`use <pack>, concept`)
+- [x] Agent step 3, repair loop: numbered text + compiler errors fed back (max 3 rounds); unreadable answers retried
+- [x] Agent step 4, verify: headless simulate; challenges must start unsolved and be solvable by their buttons
+- [x] Save & preview in the player; edit lesson source with live validation; rewrite one lesson; Stop
+- [x] Save as a module (author, description, sources with page ranges)
+- [x] Guardrails in prompts (own words, never copy) + source pages recorded · [ ] automatic overlap check against the source text
+- [x] JSON schemas exist (opt-in `structured: true`). Live finding: gemma4:12b can loop forever under schema-constrained decoding, so the default is no schema + shape example in the prompt + `extractJson` + normalizers + per-stage token caps
+- [ ] Grammar → GBNF export for llama.cpp
+- [ ] Improve first-try lesson quality with small models (few-shot from the user's own pack, smaller steps, per-step generation)
+- [ ] Persist Studio sessions (resume after reload)
 
 ## Phase 4: `concept` pack (any subject) ✅ core landed in phase 2.5
 

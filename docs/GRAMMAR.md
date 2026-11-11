@@ -486,6 +486,7 @@ Semantics:
 - `role=label` marks pointer-like kinds (branches, HEAD, tags). They are drawn in the column of what they point at, so `HEAD → main → c3` stacks over `c3`.
 - Icons are chosen from the built-in library, or given as a validated path. Raw SVG is never accepted.
 - Macro bodies may use only the building blocks, `highlight`, `note`, `wait` and other macros of the same pack. Every UPPERCASE word in a body must be one of the macro's parameters.
+- Macro lines are shape-checked when the pack compiles: `add` needs a kind (or a parameter) and an id before `to`; `connect`, `disconnect`, `point` and `flow` take ids only (no `to`); `set` needs `prop=value`. Errors raised while a lesson expands a macro are prefixed `in macro <name>:`.
 - A lesson calls a macro like any verb (`commit c2 c1 main`). Arguments replace the parameters, and the expanded lines are compiled as if written at the call site, so errors point at the lesson line.
 - Macros may call macros (nesting depth ≤ 8). A macro named like a building block, or like `ask`, `goal`, `say`, `hint` or `button`, is an error.
 - A lesson uses a data pack with `use <name>`. Its registry is the built-in packs plus the data packs of the module it belongs to.

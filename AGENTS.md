@@ -71,12 +71,18 @@ src/ai/            DOM-free model providers (phase 2)
   diagnose.ts        testConnection: CORS vs unreachable (no-cors probe), missing model, fixes
   json.ts            extractJson: JSON from messy model replies (fences, prose, <think>, trailing commas)
   settings.ts        presets (local first) + device-only provider settings (localStorage)
-src/studio/        AI Studio (phase 3, in progress)
-  extract/pdf.ts     PDF → text lines (pdf.js injected: legacy build in Node, worker in browser)
-  extract/sections.ts lines → sections (headings by repeated font sizes, boilerplate removal)
+src/studio/        AI Studio: files → pack → outline → lessons → module (DOM-free; model injected as `chat`)
+  extract/pdf.ts     PDF → text lines (pdf.js injected: legacy build in Node, lazy worker in browser via load.ts)
+  extract/text.ts    Markdown/TXT → text lines (headings sized so sectioning works)
+  extract/sections.ts lines → sections + groupChapters (repeated heading sizes, boilerplate removal)
+  extract/load.ts    browser File → chapters (lazy-loads pdf.js)
+  specs.ts           PackSpec / LessonSpec / Outline + deterministic converters to pack / scene text
+  normalize.ts       tolerant mapping of "almost right" model JSON onto the specs
+  prompts.ts         short prompts with the exact JSON shape + vocab
+  pipeline.ts        generatePack / generateOutline / generateLesson (repair loops, verifyLesson) / assembleModule
 src/app/           Alpine app
   model/             tested view models (theme, catalog, stepFlow, progress)
-  views/             Alpine components: catalog (incl. My modules), player, importer, settings (AI models)
+  views/             Alpine components: catalog (incl. My modules), player, importer, settings (AI models), studio
   stores.ts          Alpine stores: theme, route (catalog | player | import), progress, modules
   myModules.ts       app glue: module store, compiled module lessons, export download
   panels.ts          pack panels: html, slot ('main' | 'side'), legend
@@ -125,6 +131,13 @@ docs/LANGUAGE.md   friendly language guide
 - Ask for structured output with a JSON schema (`schema`) and still parse defensively (`extractJson`); small models misbehave.
 - Ollama: never send `think:false` (Gemma 4 then writes its reasoning into the answer). Reasoning arrives in `message.thinking` → `onThinking`.
 
+## Studio (AI authoring in the app)
+
+- The model only fills JSON; converters write our syntax; the compiler + `verifyLesson` judge; errors go back with numbered text. Never let a model write pack/scene text directly.
+- Default to **no schema** (small models loop under constrained decoding); keep prompts short with one exact JSON shape example; always cap output (`MAX_TOKENS`).
+- Every pattern of model misbehaviour you see live → a normalizer test in `tests/studio.normalize.test.ts` built from the real output, then the fix.
+- Unit tests use scripted fake `chat`; e2e uses a fake OpenAI-compatible server that routes on each system prompt's **first sentence**; real models only in `tests/live/` (`npm run test:live`). Dev probes: `tools/dev/studio-probe.ts`, `tools/dev/raw-probe.ts`.
+
 ## Architecture rules
 
 1. **Packs never touch the DOM.** Visuals go through `rt.fx` (Effects): `travel`, `flash`, `highlight`, `note`, `setDown`, `log`, `wait`, `badge`, `setSub`, `addNode`, `removeNode`. That keeps every lesson simulatable headless (tests, MCP `simulate`).
@@ -169,6 +182,9 @@ docs/LANGUAGE.md   friendly language guide
 - Ollama allows `localhost` origins by default; a deployed https site needs `OLLAMA_ORIGINS`.
 - pdf.js v6: `destroy()` is on the loading task, not on the document.
 - PDF sectioning: never strip digits when matching headers/footers on body text (it deletes real content); only page-edge lines get number-insensitive matching.
+- Constrained JSON decoding (Ollama `format`) can make gemma4:12b emit whitespace forever when the schema requires a field it wants to skip. Default to free JSON + normalizers + token caps.
+- A fake LLM that routes on words like "data pack" will misroute: the lesson prompt contains pack vocabulary too. Route on each prompt's opening sentence.
+- Lessons built on a data pack must `use <pack>, concept`: the prompt advertises the concept kinds, and the model will use them.
 - Multi-file doc edits in one script: assert every pattern up front, then write, so a miss doesn't leave a half-applied change.
 
 ## Git

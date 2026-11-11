@@ -119,3 +119,37 @@ test('assembleModule: packs + lessons + sources with pages → a valid v2 module
   assert.equal(m.module!.version, 2);
   assert.equal(m.module!.sources[0].pages, 'pp. 3-7');
 });
+
+test('lessons on a data pack may also use the generic concept kinds the prompt lists (found live)', async () => {
+  const p = await generatePack({ chat: scripted([PACK_SPEC]).chat, registry: builtinPacks }, { topic: 'SQL', sections });
+  const withBox = { ...LESSON_SPEC, entities: [...LESSON_SPEC.entities, { kind: 'box', id: 'app', label: 'App', props: [] }] };
+  const r = await generateLesson({ chat: scripted([withBox]).chat, registry: builtinPacks }, { item: { title: 't', about: '', sections: [0], key_concepts: [] }, sections, packs: [p.pack!] });
+  assert.ok(r.scene, r.errors.join('\n'));
+  assert.match(r.source, /^use sql, concept$/m);
+});
+
+test('error messages guide repairs: missing kind in add, unknown statement lists kinds', async () => {
+  const { compile } = await import('../src/core/index.ts');
+  const r = compile('scene concept.x "X"\nuse concept\nthing a\nbox b\nstep "s"\n  add b c', builtinPacks);
+  const msgs = r.diags.map((d) => d.msg).join('\n');
+  assert.match(msgs, /unknown statement 'thing'.*kinds you can declare: actor, box/);
+  assert.match(msgs, /unknown kind 'b'.*add KIND ID/);
+});
+
+test('goals on steps without buttons are dropped automatically instead of costing a repair round (found live)', async () => {
+  const p = await generatePack({ chat: scripted([PACK_SPEC]).chat, registry: builtinPacks }, { topic: 'SQL', sections });
+  const spec = { ...LESSON_SPEC, steps: LESSON_SPEC.steps.map((s, i) => (i === 0 ? { ...s, goals: ['linked users r9x'] } : s)) };
+  const r = await generateLesson({ chat: scripted([spec]).chat, registry: builtinPacks }, { item: { title: 't', about: '', sections: [0], key_concepts: [] }, sections, packs: [p.pack!] });
+  assert.ok(r.scene, r.errors.join('\n'));
+  assert.equal(r.attempts, 1);
+  assert.doesNotMatch(r.source, /r9x/);
+  assert.match(r.source, /goal exists r3, count row = 3/, 'challenge goals stay');
+});
+
+test('a button that changes nothing is explained in the repair message', async () => {
+  const p = await generatePack({ chat: scripted([PACK_SPEC]).chat, registry: builtinPacks }, { topic: 'SQL', sections });
+  const lazy = { ...LESSON_SPEC, steps: LESSON_SPEC.steps.map((s, i) => (i === 2 ? { ...s, buttons: [{ label: 'Go', action: 'flash users ok' }], goals: ['exists r1', 'users.rows = 2'] } : s)) };
+  const { chat, reqs } = scripted([lazy, LESSON_SPEC]);
+  await generateLesson({ chat, registry: builtinPacks }, { item: { title: 't', about: '', sections: [0], key_concepts: [] }, sections, packs: [p.pack!] });
+  assert.match(reqs[1].messages.at(-1)!.content, /buttons must change what the goals check/i);
+});

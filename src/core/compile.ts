@@ -16,8 +16,9 @@ const COMMON_PROPS = ['label', 'info', 'col'];
 
 export function compile(src: string, registry: PackRegistry): CompileResult {
   const { stmts, diags } = parse(src);
-  const error = (line: number, msg: string) => diags.push({ line, severity: 'error', msg });
-  const warn = (line: number, msg: string) => diags.push({ line, severity: 'warning', msg });
+  let prefix = '';
+  const error = (line: number, msg: string) => diags.push({ line, severity: 'error', msg: prefix + msg });
+  const warn = (line: number, msg: string) => diags.push({ line, severity: 'warning', msg: prefix + msg });
 
   const scene: Scene = { id: '', title: '', about: '', packs: [], entities: [], links: [], steps: [], data: {} };
   const byId = new Map<string, Entity>();
@@ -35,6 +36,11 @@ export function compile(src: string, registry: PackRegistry): CompileResult {
     addLink(a, b) { scene.links.push([a, b]); },
     kindOf: () => null,
     compileAction: () => null,
+    withPrefix(p, fn) {
+      const before = prefix;
+      prefix = before + p;
+      try { return fn(); } finally { prefix = before; }
+    },
     entity(id, line) {
       const e = byId.get(id);
       if (!e) error(line, `unknown entity '${id}'${didYouMean(id, byId.keys())}`);
@@ -135,7 +141,8 @@ export function compile(src: string, registry: PackRegistry): CompileResult {
         else if (byId.has(s.head) || verbOf(s.head) || CORE_VERBS.includes(s.head)) {
           error(s.line, `'${s.head}' is an action; put it inside a step`);
         } else {
-          error(s.line, `unknown statement '${s.head}'${didYouMean(s.head, allTop())}`);
+          const kinds = packs.flatMap((p) => Object.entries(p.entities).filter(([, k]) => !k.generatedBy).map(([n]) => n));
+          error(s.line, `unknown statement '${s.head}'${didYouMean(s.head, allTop())}${kinds.length ? `; kinds you can declare: ${kinds.join(', ')}` : ''}`);
         }
       }
     }

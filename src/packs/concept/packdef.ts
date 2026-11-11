@@ -14,6 +14,35 @@ const NAME = /^[a-z][a-z0-9-]{1,31}$/;
 const PARAM = /^[A-Z][A-Z0-9_]*$/;
 const KIND_OPTS = ['icon', 'swatch', 'tier', 'show', 'about', 'role'];
 
+const CONCEPT_KINDS = ['actor', 'box', 'process', 'idea', 'doc', 'store'];
+
+/** Static shape check for building-block lines inside macros (arguments are often parameters). */
+function macroLineShape(head: string, args: string[], kinds: Set<string>, params: string[]): string {
+  const isParam = (w: string) => params.includes(w);
+  const pos = args.filter((a) => !/^[A-Za-z_][\w.-]*=/.test(a));
+  switch (head) {
+    case 'add': {
+      if (pos[1] === 'to' || pos.length < 2) return `add needs a KIND and an ID before 'to' (e.g. add repository REPO to REMOTE)`;
+      if (!isParam(pos[0]) && !kinds.has(pos[0]) && !CONCEPT_KINDS.includes(pos[0])) return `add: '${pos[0]}' is not a kind of this pack (kinds: ${[...kinds].join(', ')})`;
+      if (pos[2] !== undefined && pos[2] !== 'to') return `add: expected 'to PARENT' after the id, got '${pos[2]}'`;
+      return '';
+    }
+    case 'connect': case 'disconnect': case 'point':
+      if (pos.includes('to')) return `${head} takes two ids; remove 'to' (e.g. ${head} A B)`;
+      return pos.length === 2 ? '' : `${head} needs exactly two ids (e.g. ${head} A B)`;
+    case 'flow':
+      if (pos.includes('to')) return `flow takes ids only; remove 'to' (e.g. flow A B)`;
+      return pos.length >= 2 ? '' : 'flow needs at least two ids';
+    case 'set':
+      return pos.length >= 1 && args.some((a) => a.includes('=')) ? '' : 'set needs ID prop=value';
+    case 'remove': case 'flash': case 'unmark':
+      return pos.length >= 1 ? '' : `${head} needs an id`;
+    case 'mark':
+      return pos.length >= 2 ? '' : 'mark needs ID "text"';
+  }
+  return '';
+}
+
 export interface PackCompileResult {
   pack: PackDef | null;
   diags: Diag[];
@@ -100,6 +129,8 @@ export function compilePack(src: string, base: PackRegistry): PackCompileResult 
         error(b.line, `unknown action '${b.head}'${didYouMean(b.head, [...PRIMITIVES, ...CORE_ACTIONS, ...macroNames])}; macros may use: ${PRIMITIVES.join(' ')} ${CORE_ACTIONS.join(' ')} and other macros`);
         ok = false;
       }
+      const shape = macroLineShape(b.head, b.args.map((t) => t.v), new Set(Object.keys(kinds)), params);
+      if (shape) { error(b.line, shape); ok = false; }
       for (const t of b.args) {
         for (const w of t.v.match(/\b[A-Z][A-Z0-9_]*\b/g) ?? []) {
           if (!params.includes(w) && !t.q) { error(b.line, `'${w}' is not a parameter of macro ${mname} (parameters: ${params.join(' ') || 'none'})`); ok = false; }
@@ -119,11 +150,15 @@ export function compilePack(src: string, base: PackRegistry): PackCompileResult 
         const actions: Action[] = [];
         depth++;
         try {
-          for (const b of body) {
-            const a = c.compileAction(values[b.head] ?? b.head, b.args.map(sub), s.line);
-            if (!a) return null;
-            actions.push(a);
-          }
+          const ok = c.withPrefix(`in macro ${mname}: `, () => {
+            for (const b of body) {
+              const a = c.compileAction(values[b.head] ?? b.head, b.args.map(sub), s.line);
+              if (!a) return false;
+              actions.push(a);
+            }
+            return true;
+          });
+          if (!ok) return null;
         } finally {
           depth--;
         }

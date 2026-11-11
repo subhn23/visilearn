@@ -8,6 +8,7 @@ export const TRACKS: Record<string, string> = {
   k8s: 'Kubernetes',
   code: 'Programming',
   robo: 'Robotics',
+  concept: 'Concepts',
 };
 const TRACK_ORDER = Object.keys(TRACKS);
 

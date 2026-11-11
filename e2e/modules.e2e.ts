@@ -143,6 +143,28 @@ test('export downloads a valid module file; delete removes the module', async ()
   await ctx.close();
 });
 
+test('a module that carries its own pack: import, see the pack, open a lesson, press a button', async () => {
+  const ctx = await browser.createBrowserContext();
+  const p = await open(ctx);
+  await importFile(p, new URL('../examples/modules/git-basics.visilearn.json', import.meta.url).pathname);
+  const review = await text(p, 'main');
+  assert.match(review, /Adds new topic vocabulary/);
+  assert.match(review, /git: Commits, branches and merges/);
+  assert.match(review, /never code/);
+  await clickText(p, 'Add to My modules');
+  assert.match(await text(p, '#my-modules'), /pack: git/);
+
+  await p.goto(BASE + '#/s/m:visilearn-git-basics/git.branches', { waitUntil: 'networkidle0' });
+  await p.click('button[aria-label^="Step 4"]');
+  await sleep(600);
+  const before = await p.$$eval('.node', (els) => els.length);
+  await clickText(p, 'git merge feature');
+  await sleep(1200);
+  assert.equal(await p.$$eval('.node', (els) => els.length), before + 1, 'merge commit appeared');
+  assert.match(await text(p, 'aside p[aria-live]'), /Challenge complete/);
+  await ctx.close();
+});
+
 test('no uncaught page errors', () => {
   assert.deepEqual(errors, []);
 });

@@ -1,6 +1,6 @@
 # visilearn Scene Language: Formal Grammar
 
-Grammar version: 1.1
+Grammar version: 1.2
 Status: normative. When this document and the implementation disagree, one of them is a bug.
 
 This is the authoritative specification of the language the engine compiles into an interactive
@@ -150,7 +150,7 @@ common-kv    = 'label=' value | 'info=' value | 'col=' integer ;
 ## 4. Steps
 
 ```text
-step-line    = say | hint | highlight | note | wait | ask | goal | pack-action ;
+step-line    = say | hint | highlight | note | wait | ask | goal | button | pack-action ;
 
 say          = 'say' text ;                               (* extra paragraph under the step text *)
 hint         = 'hint' text ;                              (* revealed on demand *)
@@ -162,6 +162,8 @@ options      = bare-token-with-pipes | positional positional { positional } ;
 bare-token-with-pipes = /[^\s|]+(\|[^\s|]+)+/ ;          (* 21|22|80 *)
 answer       = (* the exact text of one option, or its 1-based number *) ;
 goal         = 'goal' condition { ',' condition } ;
+button       = 'button' quoted-token action-line ;              (* learner-triggered action *)
+action-line  = highlight | note | wait | pack-action ;
 condition    = (* pack-defined; see §5. Conditions cannot contain ',' *) ;
 
 pack-action  = verb { argument }
@@ -174,6 +176,7 @@ Semantics:
 - `highlight`, `note` and every other decoration last only for the step.
 - `ask` **pauses** the step until the learner picks the correct option. An ask placed before an action gives the predict → observe pattern. An ask needs at least 2 options, and `answer` must resolve to one of them.
 - `goal` adds items to a live checklist that is re-evaluated whenever state changes. A step is **complete** when its actions have finished, every ask has been answered and every goal is met.
+- `button` adds a button to the step panel. Pressing it runs its action (any action line) on the live scene, after which goals are re-checked. Buttons don't run during scripted playback, so they are the "learn by doing" control for any pack.
 - Verbs declared with a subject (e.g. `send`) accept both `A send …` and `send A …`.
 - Entering step *n* replays steps 1…n-1 instantly (no animation, asks skipped), so state such as failed devices or created files carries forward.
 
@@ -382,14 +385,134 @@ step "Your turn"
   goal cwd /etc, ran cat, output "localhost", mode /home/asha/deploy.sh 755
 ```
 
-## 6. Name resolution and diagnostics
+### Pack `concept`
+
+Generic building blocks for any subject. It is also the **base of every data pack** (§6): data
+packs add their own kinds and macros, and the building blocks and goals below are available in
+all of them. Packs of this family share **one graph state**, so `use git, concept` works on a
+single graph.
+
+#### Entity kinds
+
+| Kind | Tier | Icon | Meaning |
+|---|---|---|---|
+| `actor` | 0 | person | someone or something that acts |
+| `box` | 1 | box | a component or thing |
+| `process` | 1 | gear | a step that does work |
+| `idea` | 1 | circle | a concept or state |
+| `doc` | 2 | file | a document, message or data item |
+| `store` | 3 | database | where data is kept |
+
+Any `key=value` prop is accepted on these kinds and becomes graph state (readable by goals).
+
+#### Building blocks (verbs)
+
+```text
+add-action        = 'add' kind id [ 'to' ref ] { kv-token } ;  (* creates a hidden entity, shown when it runs *)
+remove-action     = 'remove' id-list ;
+connect-action    = 'connect' ref ref ;
+disconnect-action = 'disconnect' ref ref ;
+point-action      = 'point' ref ref ;          (* drop A's outgoing links, then link A → B (pointers, labels) *)
+set-action        = 'set' ref kv-token { kv-token } ;
+flow-action       = 'flow' ref ref { ref } [ 'label=' value ] [ 'tone=' tone ] ;
+mark-action       = 'mark' ref text ;          (* persistent badge *)
+unmark-action     = 'unmark' ref ;
+flash-action      = 'flash' ref [ tone ] ;
+tone              = 'ok' | 'bad' | 'warn' | 'info' ;
+```
+
+- An `add` registers its id when the lesson compiles, so later lines can refer to it. An id must be added before it is referenced, and ids are unique.
+- When a kind declares `show=PROP`, `set ID PROP=…` updates the node's sub-label.
+
+#### Goal conditions
+
+```text
+concept-condition = ref '.' prop ( '=' | '!=' ) text
+                  | 'exists' ref | 'missing' ref
+                  | 'linked' ref ref                       (* either direction *)
+                  | 'count' kind ( '=' | '>=' | '<=' ) integer ;
+```
+
+```scene
+scene concept.grammar-demo "Requests and caches"
+use concept
+
+actor user label="You"
+process app label="Web app"
+store cache label="Cache"
+store db label="Database"
+link user app
+link app cache
+link app db
+
+step "First request misses the cache"
+  flow user app db label="query"
+  set cache status=empty
+
+step "Your turn"
+  button "Warm the cache" set cache status=warm
+  goal cache.status = warm
+```
+
+## 6. Pack definition language (data packs)
+
+A **data pack** adds vocabulary without code. Modules carry data packs, the Studio's model
+writes them, and the marketplace distributes them. A data pack is pure data: kinds (name, icon,
+colour, props) and **macros** composed from the concept building blocks. The engine never runs
+code from a pack.
+
+```text
+pack-file   = 'pack' pack-name quoted-token NEWLINE { pack-stmt NEWLINE } ;
+pack-name   = /[a-z][a-z0-9-]{1,31}/ ;                  (* must not be a built-in pack name *)
+pack-stmt   = about-stmt | kind-def | macro-def ;
+kind-def    = 'kind' kind-name { kind-opt } NEWLINE [ INDENT> { prop-def NEWLINE } DEDENT ] ;
+kind-name   = /[a-z][a-z0-9-]*/ ;                       (* not a building-block or core keyword *)
+kind-opt    = 'icon=' icon | 'swatch=' swatch | 'tier=' /[0-9]/ | 'show=' prop | 'role=label' | 'about=' value ;
+icon        = library-icon | '"path:' svg-path '"' ;
+library-icon= 'box' | 'circle' | 'diamond' | 'database' | 'table' | 'person' | 'people' | 'server'
+            | 'file' | 'folder' | 'gear' | 'cloud' | 'lock' | 'key' | 'tag' | 'flag' | 'star'
+            | 'bolt' | 'clock' | 'chat' | 'globe' | 'book' | 'cpu' | 'list' | 'check'
+            | 'question' | 'branch' | 'layers' | 'arrow' ;
+svg-path    = /[MmLlHhVvCcSsQqTtAaZz0-9.,\s-]{1,2000}/ ; (* commands and numbers only: no markup *)
+swatch      = 'mustard' | 'mint' | 'lilac' | 'peach' | 'sky' | 'rose' ;
+prop-def    = 'prop' prop [ text ] ;
+macro-def   = 'macro' macro-name { PARAM } NEWLINE INDENT> { macro-line NEWLINE } DEDENT ;
+PARAM       = /[A-Z][A-Z0-9_]*/ ;
+macro-line  = ( building-block | 'highlight' | 'note' | 'wait' | macro-name ) { argument } ;
+```
+
+Semantics:
+
+- `role=label` marks pointer-like kinds (branches, HEAD, tags). They are drawn in the column of what they point at, so `HEAD → main → c3` stacks over `c3`.
+- Icons are chosen from the built-in library, or given as a validated path. Raw SVG is never accepted.
+- Macro bodies may use only the building blocks, `highlight`, `note`, `wait` and other macros of the same pack. Every UPPERCASE word in a body must be one of the macro's parameters.
+- A lesson calls a macro like any verb (`commit c2 c1 main`). Arguments replace the parameters, and the expanded lines are compiled as if written at the call site, so errors point at the lesson line.
+- Macros may call macros (nesting depth ≤ 8). A macro named like a building block, or like `ask`, `goal`, `say`, `hint` or `button`, is an error.
+- A lesson uses a data pack with `use <name>`. Its registry is the built-in packs plus the data packs of the module it belongs to.
+
+```pack
+pack git "Git basics"
+about "Commits, branches and merges."
+kind commit icon=circle swatch=mustard show=message about="A saved snapshot of the project."
+  prop message "what changed"
+kind branch icon=tag swatch=mint tier=0 role=label about="A movable label that points at a commit."
+macro commit ID PARENT BRANCH
+  add commit ID to PARENT
+  point BRANCH ID
+  flash ID ok
+macro branch NAME AT
+  add branch NAME
+  point NAME AT
+```
+
+## 7. Name resolution and diagnostics
 
 - **Entity references** (`ref`) must name a declared or generated entity. An unknown reference is an error carrying a suggestion, e.g. `unknown entity '/etc/hostz' (did you mean '/etc/hosts'?)`.
 - **Keywords** are case-sensitive and lower-case.
 - **Severity:** *errors* make the scene invalid (it is not rendered; the catalog lists it under "Scenes with errors"). *Warnings* are reported but the scene still runs.
 - Diagnostics have the form `L<line> <severity>: <message>` and are sorted by line. They are deliberately short and actionable so an author or AI can fix them in one pass.
 
-## 7. A minimal valid scene
+## 8. A minimal valid scene
 
 ```scene
 scene net.minimal "Minimal"
@@ -401,9 +524,10 @@ step "Hello"
   a send b:80
 ```
 
-## 8. Changelog
+## 9. Changelog
 
 | Version | Change |
 |---|---|
+| 1.2 | Core step line `button`. Hidden entities (created by actions). Pack `concept` (building blocks, graph goals). §6 pack definition language for data packs (kinds, icons, props, macros); the pack registry is per module. |
 | 1.1 | Pack `linux`: `fs` directive (tree, `|` content lines, `mode=`, `owner=`), generated kinds `dir`/`file` with path ids, `run` verb, goals `cwd exists missing mode ran output contains`. Packs may generate entities. |
 | 1.0 | Core language: `scene use about link step`, step lines `say hint highlight note wait ask goal`, pack `net` (`rules`, `send ping kill revive`, reachability goals). |

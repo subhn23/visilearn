@@ -11,7 +11,7 @@ export interface CompileResult {
 
 const ID = /^[A-Za-z][\w-]*$/;
 export const CORE_TOP = ['scene', 'use', 'about', 'link', 'step'];
-export const CORE_VERBS = ['say', 'hint', 'highlight', 'note', 'ask', 'goal', 'wait'];
+export const CORE_VERBS = ['say', 'hint', 'highlight', 'note', 'ask', 'goal', 'wait', 'button'];
 const COMMON_PROPS = ['label', 'info', 'col'];
 
 export function compile(src: string, registry: PackRegistry): CompileResult {
@@ -33,6 +33,8 @@ export function compile(src: string, registry: PackRegistry): CompileResult {
       return true;
     },
     addLink(a, b) { scene.links.push([a, b]); },
+    kindOf: () => null,
+    compileAction: () => null,
     entity(id, line) {
       const e = byId.get(id);
       if (!e) error(line, `unknown entity '${id}'${didYouMean(id, byId.keys())}`);
@@ -68,6 +70,8 @@ export function compile(src: string, registry: PackRegistry): CompileResult {
   const kindOf = (k: string) => packs.find((p) => p.entities[k]);
   const directiveOf = (k: string) => packs.find((p) => p.directives?.[k]);
   const verbOf = (k: string) => packs.find((p) => p.verbs?.[k]);
+  c.kindOf = (k) => { const p = kindOf(k); return p ? { pack: p.name, def: p.entities[k] } : null; };
+  c.compileAction = (head, args, line) => compileAction({ line, indent: 0, head, args, children: [] }, c, packs, verbOf, byId);
   const allTop = () => [...CORE_TOP, ...packs.flatMap((p) => [...Object.keys(p.entities), ...Object.keys(p.directives ?? {})])];
 
   // ---- pass 1: entities -----------------------------------------------------
@@ -92,7 +96,7 @@ export function compile(src: string, registry: PackRegistry): CompileResult {
         kind: s.head,
         pack: pack.name,
         label: ids.length > 1 ? id : kv.label ?? id,
-        sub: kind.sub ? rest[0]?.v : undefined,
+        sub: kind.sub ? rest[0]?.v : kind.show ? kv[kind.show] : undefined,
         props: kv,
         line: s.line,
       };
@@ -145,7 +149,7 @@ export function compile(src: string, registry: PackRegistry): CompileResult {
   for (const s of stmts) {
     if (s.head !== 'step') continue;
     const { pos } = splitArgs(s.args);
-    const step: Step = { line: s.line, text: pos.map((t) => t.v).join(' '), say: [], hints: [], actions: [], asks: [], goals: [] };
+    const step: Step = { line: s.line, text: pos.map((t) => t.v).join(' '), say: [], hints: [], actions: [], asks: [], goals: [], buttons: [] };
     if (!step.text) error(s.line, 'step needs text: step "What the learner sees"');
     for (const a of s.children) compileStepLine(a, step, c, packs, verbOf, byId);
     scene.steps.push(step);
@@ -165,34 +169,20 @@ function compileStepLine(
   const push = (a: Action | null) => { if (a) step.actions.push(a); };
 
   switch (s.head) {
+    case 'button': {
+      const [label, head, ...rest] = s.args;
+      if (!label?.q || !head) { c.error(s.line, 'usage: button "Label" <action>   e.g. button "Commit" commit c3 c2 main'); return; }
+      if (['ask', 'goal', 'say', 'hint', 'button'].includes(head.v)) { c.error(s.line, `a button runs an action; '${head.v}' is not one`); return; }
+      const action = compileAction({ line: s.line, indent: s.indent, head: head.v, args: rest, children: [] }, c, packs, verbOf, byId);
+      if (action) step.buttons.push({ line: s.line, label: label.v, action });
+      return;
+    }
     case 'say':
       step.say.push(text(s.args));
       return;
     case 'hint':
       step.hints.push(text(s.args));
       return;
-    case 'highlight': {
-      const ids = s.args.flatMap((t) => t.v.split(',')).filter(Boolean);
-      if (!ids.length) { c.error(s.line, 'usage: highlight a[, b]'); return; }
-      const ok = ids.filter((id) => c.entity(id, s.line));
-      push({ line: s.line, text: `highlight ${ok.join(', ')}`, run: (rt) => ok.forEach((id) => rt.fx.highlight(id)) });
-      return;
-    }
-    case 'note': {
-      const [id, ...rest] = s.args;
-      const msg = text(rest);
-      if (!id || !msg) { c.error(s.line, 'usage: note <id> "text"'); return; }
-      if (!c.entity(id.v, s.line)) return;
-      push({ line: s.line, text: `note ${id.v}`, run: (rt) => rt.fx.note(id.v, msg) });
-      return;
-    }
-    case 'wait': {
-      const m = /^(\d+(?:\.\d+)?)(ms|s)?$/.exec(s.args[0]?.v ?? '');
-      if (!m) { c.error(s.line, 'usage: wait 500ms | wait 1s'); return; }
-      const ms = parseFloat(m[1]) * (m[2] === 's' ? 1000 : 1);
-      push({ line: s.line, text: `wait ${ms}ms`, run: (rt) => rt.fx.wait(ms) });
-      return;
-    }
     case 'ask': {
       const { pos, kv } = splitArgs(s.args);
       const [q, ...optToks] = pos;
@@ -224,6 +214,36 @@ function compileStepLine(
     }
   }
 
+  push(compileAction(s, c, packs, verbOf, byId));
+}
+
+/** An action line: highlight / note / wait, or a pack verb ("verb args" or "subject verb args"). */
+function compileAction(
+  s: Stmt, c: CompileCtx, packs: PackDef[],
+  verbOf: (k: string) => PackDef | undefined, byId: Map<string, Entity>,
+): Action | null {
+  const text = (ts: Token[]) => ts.map((t) => t.v).join(' ');
+  switch (s.head) {
+    case 'highlight': {
+      const ids = s.args.flatMap((t) => t.v.split(',')).filter(Boolean);
+      if (!ids.length) { c.error(s.line, 'usage: highlight a[, b]'); return null; }
+      const ok = ids.filter((id) => c.entity(id, s.line));
+      return { line: s.line, text: `highlight ${ok.join(', ')}`, run: (rt) => ok.forEach((id) => rt.fx.highlight(id)) };
+    }
+    case 'note': {
+      const [id, ...rest] = s.args;
+      const msg = text(rest);
+      if (!id || !msg) { c.error(s.line, 'usage: note <id> "text"'); return null; }
+      if (!c.entity(id.v, s.line)) return null;
+      return { line: s.line, text: `note ${id.v}`, run: (rt) => rt.fx.note(id.v, msg) };
+    }
+    case 'wait': {
+      const m = /^(\d+(?:\.\d+)?)(ms|s)?$/.exec(s.args[0]?.v ?? '');
+      if (!m) { c.error(s.line, 'usage: wait 500ms | wait 1s'); return null; }
+      const ms = parseFloat(m[1]) * (m[2] === 's' ? 1000 : 1);
+      return { line: s.line, text: `wait ${ms}ms`, run: (rt) => rt.fx.wait(ms) };
+    }
+  }
   // pack verbs: "verb args" or "subject verb args"
   let verb = s.head;
   let subject: Entity | undefined;
@@ -238,13 +258,13 @@ function compileStepLine(
     const known = [...CORE_VERBS, ...packs.flatMap((p) => Object.keys(p.verbs ?? {}))];
     const guess = byId.has(s.head) ? didYouMean(s.args[0]?.v ?? '', known) : didYouMean(s.head, known);
     c.error(s.line, `unknown action '${byId.has(s.head) ? s.args[0]?.v ?? '' : s.head}'${guess}; actions: ${known.join(', ')}`);
-    return;
+    return null;
   }
   const def = pack.verbs![verb];
   if (def.subject && !subject) {
     const first = args[0];
     if (first && byId.has(first.v)) { subject = byId.get(first.v); args = args.slice(1); }
-    else { c.error(s.line, `usage: ${def.usage}`); return; }
+    else { c.error(s.line, `usage: ${def.usage}`); return null; }
   }
-  push(def.compile(subject, args, s, c));
+  return def.compile(subject, args, s, c);
 }

@@ -9,6 +9,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { compile, CORE_VOCAB, simulate } from '../src/core/index.ts';
 import type { Diag } from '../src/core/index.ts';
+import { compilePack } from '../src/packs/concept/packdef.ts';
 import { packs } from '../src/packs/index.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -50,6 +51,17 @@ server.registerTool('validate', {
   const { scene, diags } = compile(source, packs);
   if (!scene) return text(`INVALID\n${fmtDiags(diags)}`);
   const summary = `OK ${scene.id}: ${scene.entities.length} entities, ${scene.links.length} links, ${scene.steps.length} steps`;
+  return text(diags.length ? `${summary}\n${fmtDiags(diags)}` : summary);
+});
+
+server.registerTool('validate_pack', {
+  title: 'Validate a data pack',
+  description: 'Compile a data pack definition (pack/kind/prop/macro, see docs/GRAMMAR.md §6). Data packs add vocabulary for a new topic without code; lessons use them with `use <name>` when the pack ships in the same module.',
+  inputSchema: { source: z.string().describe('full pack definition text') },
+}, async ({ source }) => {
+  const { pack, diags } = compilePack(source, packs);
+  if (!pack) return text(`INVALID\n${fmtDiags(diags)}`);
+  const summary = `OK pack ${pack.name}: kinds ${Object.keys(pack.entities).join(', ')}\n${pack.vocab}`;
   return text(diags.length ? `${summary}\n${fmtDiags(diags)}` : summary);
 });
 

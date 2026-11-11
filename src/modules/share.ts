@@ -37,7 +37,7 @@ export async function decodeShare(payload: string, registry: PackRegistry): Prom
     text = new TextDecoder('utf-8', { fatal: true }).decode(await pipe(fromBase64Url(payload), new DecompressionStream('deflate-raw')));
     JSON.parse(text);
   } catch {
-    return { module: null, errors: [DAMAGED], warnings: [], lessons: [] };
+    return { module: null, errors: [DAMAGED], warnings: [], lessons: [], packs: [], registry };
   }
   return parseModule(text, registry);
 }

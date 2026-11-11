@@ -10,6 +10,7 @@ export interface ModuleCard {
   author: string;
   description: string;
   sources: string[];
+  packs: { name: string; about: string }[];
   lessons: { key: string; sceneId: string; title: string; steps: number; pct: number }[];
   pct: number;
   errors: string[];
@@ -34,6 +35,7 @@ export function buildModuleCards(modules: StoredModule[], registry: PackRegistry
       author: m.author,
       description: m.description,
       sources: m.sources.map((s) => (s.pages ? `${s.title}, ${s.pages}` : s.title)),
+      packs: check.packs.map((p) => ({ name: p.name, about: p.about })),
       lessons,
       pct: total ? Math.round((finished / total) * 100) : 0,
       errors: check.errors,

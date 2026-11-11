@@ -1,11 +1,10 @@
 import type { Alpine } from 'alpinejs';
 import { createState, present, resetTransient } from '../../core/runtime.ts';
 import type { Ask, Entity, Runtime, Scene, Tone } from '../../core/types.ts';
-import { packs } from '../../packs/index.ts';
 import { Stage } from '../../render/stage.ts';
 import { isStepComplete, resumeIndex, stepStatus } from '../model/stepFlow.ts';
 import { panels } from '../panels.ts';
-import { byId } from '../scenes.ts';
+import { byId, registryFor } from '../scenes.ts';
 import { progress } from '../stores.ts';
 
 interface AskView {
@@ -22,6 +21,7 @@ interface AskView {
 export function registerPlayer(alpine: Alpine) {
   alpine.data('player', (sceneId: string) => {
     const scene = byId(sceneId) as Scene;
+    const packs = registryFor(sceneId); // built-ins + this lesson's module packs
     let stage: Stage;
     let live: Runtime;
     let replay: Runtime;
@@ -43,6 +43,7 @@ export function registerPlayer(alpine: Alpine) {
       text: '',
       say: [] as string[],
       hints: [] as string[],
+      buttons: [] as { label: string; busy: boolean }[],
       ask: null as AskView | null,
       goals: [] as { label: string; met: boolean }[],
       status: { tone: 'idle', text: '' } as ReturnType<typeof stepStatus>,
@@ -174,6 +175,7 @@ export function registerPlayer(alpine: Alpine) {
         this.text = step.text;
         this.say = step.say;
         this.hints = step.hints;
+        this.buttons = step.buttons.map((b) => ({ label: b.label, busy: false }));
         this.ask = null;
         this.refresh();
 
@@ -184,6 +186,14 @@ export function registerPlayer(alpine: Alpine) {
         if (epoch !== stage.epoch) return;
         actionsDone = true;
         this.refresh();
+      },
+
+      /** learner pressed a step button: run its action on the live scene, then re-check goals */
+      async press(this: any, i: number) {
+        const b = scene.steps[this.idx].buttons[i];
+        if (!b || this.buttons[i]?.busy) return;
+        this.buttons[i].busy = true;
+        try { await b.action.run(live); } finally { if (this.buttons[i]) this.buttons[i].busy = false; this.changed(); }
       },
 
       next(this: any) {

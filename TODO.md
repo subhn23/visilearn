@@ -43,11 +43,29 @@ A **module** is a portable bundle of lessons: `{ format, version, id, title, des
 - [x] Tests with fake fetch for every provider; e2e against fake servers; live tests vs local Ollama (`npm run test:live`, gemma4:12b ✓)
 - [ ] Optional later: in-browser models (WebGPU) for zero-install local use
 
-## Phase 3: Studio (AI agent that builds modules from your files)
+## Phase 2.5: Open pack system (packs are not a fixed list) ✅
+
+Packs must be addable on the go (by the Studio, by modules, later by the marketplace), so a pack can be **data**:
+
+- [x] Built-in `concept` pack: generic kinds + building blocks (`add remove connect disconnect point set flow mark unmark flash`) + graph goals (`ID.prop = v`, `exists`, `missing`, `linked`, `count`)
+- [x] Pack definition language (`pack`, `kind` with icon/swatch/tier/show/role, `prop`, `macro` with UPPERCASE params) → compiled, validated, no code executed
+- [x] Icon library + validated path icons (no raw SVG, so strangers' packs can't inject markup)
+- [x] Registry per module (`withPacks`); modules carry `packs` (format v2); importer shows the packs a module adds
+- [x] Core `button` step line: learner-triggered actions for any pack
+- [x] Hidden entities (created later by `add`), shared state for the concept family, `link`/`unlink` effects
+- [x] `role=label` layout: branches/HEAD stack on what they point at; history flows left → right
+- [x] Example: `examples/modules/git-basics.visilearn.json` carries a `git` pack (commits, branches, merge); tests prove its challenges are solvable
+- [x] Grammar 1.2 (concept pack + §6 pack definition language, test-enforced) · MODULES.md v2 · MCP `validate_pack`
+- [ ] Direction-aware layout for histories (a merge commit should sit after both parents)
+- [ ] Pack versioning + namespacing for the marketplace (`author/name@version`), conflict handling across modules
+- [ ] Later: sandboxed code packs (iframe/worker, no network/storage) for reviewed marketplace simulators
+
+## Phase 3: Studio (AI agent that builds modules, and new packs, from your files)
 
 - [~] Read files: PDF text extraction done (pdf.js, injectable; Node-tested). Still to do: browser worker wiring, DOCX (mammoth), Markdown, TXT
 - [x] Split documents into sections (chapters/headings) with page references, drop headers/footers/TOC, join wrapped titles
 - [x] Tested against the sample books in `pdfs/`: Git (195 pp → 66 chapters), PostgreSQL (74 pp → 34 chapters), < 1 s each
+- [ ] Agent step 0, pack: model proposes a data pack for the topic (kinds, icons, macros) as structured JSON → pack text → `compilePack` repair loop; reuse built-in packs when they fit
 - [ ] Agent step 1, outline: model proposes lessons per section (structured JSON), user can edit/approve
 - [ ] Agent step 2, draft: structured lesson plan (JSON) → deterministic converter → scene text
 - [ ] Agent step 3, repair loop: compiler diagnostics fed back to the model (max N rounds)
@@ -57,12 +75,12 @@ A **module** is a portable bundle of lessons: `{ format, version, id, title, des
 - [ ] Guardrails: paraphrase, never copy long passages; record source pages for reviewers
 - [ ] Grammar → GBNF / JSON schema export for constrained decoding (llama.cpp / Ollama `format`)
 
-## Phase 4: `concept` pack (any subject)
+## Phase 4: `concept` pack (any subject) ✅ core landed in phase 2.5
 
-- [ ] Generic entities (box, actor, store, process…), arrows, states, groups
-- [ ] Verbs: `move`, `set`, `show`, `hide`, `connect`, `flow` (animated token along an arrow)
-- [ ] Goals for quizzes/ordering/matching
-- [ ] GRAMMAR.md section + lessons built from the sample books (Git, PostgreSQL)
+- [x] Generic entities (actor, box, process, idea, doc, store), links, states (props), flows
+- [x] Building blocks + goals (see phase 2.5)
+- [ ] Groups/containers, ordering and matching quiz goals
+- [ ] Built-in concept lessons; Studio-made lessons from the sample books (Git, PostgreSQL)
 
 ## Phase 5: Marketplace (crowdsourced)
 

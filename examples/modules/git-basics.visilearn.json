@@ -1,0 +1,36 @@
+{
+  "format": "visilearn.module",
+  "version": 2,
+  "id": "visilearn-git-basics",
+  "title": "Git basics",
+  "description": "Commits and branches, shown the way Git really stores them. Carries its own \"git\" pack.",
+  "author": "visilearn",
+  "track": "concept",
+  "tags": [
+    "git",
+    "sample",
+    "data-pack"
+  ],
+  "sources": [
+    {
+      "title": "Git Notes for Professionals (GoalKicker.com)",
+      "pages": "ch. 1, 4, 5",
+      "license": "CC BY-SA 4.0 (concepts paraphrased)"
+    }
+  ],
+  "created": "2026-11-11T00:00:00.000Z",
+  "updated": "2026-11-11T00:00:00.000Z",
+  "scenes": [
+    {
+      "source": "scene git.commits \"Commits are snapshots\"\nabout \"A commit saves your whole project and remembers the commit before it.\"\nuse git\n\ncommit c1 message=\"first draft\"\nbranch main\nhead here label=\"HEAD\"\nlink here main\nlink main c1\n\nstep \"One commit\"\n  say \"A commit is a snapshot of every file at one moment, plus a short message.\"\n  highlight c1\n  note c1 \"snapshot + message\"\n\nstep \"Committing again\"\n  ask \"When you commit again, what does the new commit point to?\" \"Nothing\" \"Its parent, c1\" \"Every older commit\" answer=2\n  commit c2 c1 main\n  say \"The new commit links to its parent, and main moved forward on its own.\"\n\nstep \"Your turn\"\n  say \"Make two more commits on main.\"\n  button \"git commit\" commit c3 c2 main\n  button \"git commit (again)\" commit c4 c3 main\n  goal count commit = 4, linked main c4\n"
+    },
+    {
+      "source": "scene git.branches \"Branches are just labels\"\nabout \"Creating a branch copies nothing: it adds a label that moves when you commit.\"\nuse git\n\ncommit c1 message=\"start\"\ncommit c2 message=\"add menu\"\nbranch main\nhead here label=\"HEAD\"\nlink c1 c2\nlink here main\nlink main c2\n\nstep \"A branch is a label\"\n  highlight main\n  note main \"points at c2\"\n\nstep \"Create a branch\"\n  ask \"git branch feature: how much gets copied?\" \"All the files\" \"Only the newest commit\" \"Nothing: it is a new label\" answer=3\n  branch feature c2\n\nstep \"Switch and commit\"\n  switch here feature\n  commit f1 c2 feature\n  say \"Only feature moved forward. main still points at c2.\"\n\nstep \"Your turn: merge\"\n  say \"Bring the work from feature back into main.\"\n  hint \"A merge commit has two parents: c2 (main) and f1 (feature).\"\n  button \"git merge feature\" merge m1 c2 f1 main\n  goal linked m1 f1, linked main m1\n"
+    }
+  ],
+  "packs": [
+    {
+      "source": "pack git \"Git basics\"\nabout \"Commits, branches and merges, the way Git really stores them.\"\nkind commit icon=circle swatch=mustard tier=1 show=message about=\"A saved snapshot of the whole project. Each commit remembers its parent.\"\n  prop message \"what changed\"\nkind branch icon=tag swatch=mint tier=0 role=label about=\"A branch is only a movable label that points at one commit.\"\nkind head icon=flag swatch=rose tier=0 role=label about=\"HEAD marks the branch you are working on right now.\"\nmacro commit ID PARENT BRANCH\n  add commit ID to PARENT\n  point BRANCH ID\n  flash ID ok\nmacro branch NAME AT\n  add branch NAME\n  point NAME AT\nmacro switch HEAD_ID BRANCH\n  point HEAD_ID BRANCH\nmacro merge ID INTO FROM BRANCH\n  add commit ID to INTO message=\"merge\"\n  connect FROM ID\n  point BRANCH ID\n  flash ID ok\n"
+    }
+  ]
+}

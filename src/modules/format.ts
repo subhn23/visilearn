@@ -1,6 +1,8 @@
 // Module format v1: a portable bundle of lessons. DOM-free; spec in docs/MODULES.md.
 import { compile } from '../core/compile.ts';
-import type { PackRegistry, Scene } from '../core/types.ts';
+import type { PackDef, PackRegistry, Scene } from '../core/types.ts';
+import { compilePack } from '../packs/concept/packdef.ts';
+import { withPacks } from '../packs/index.ts';
 
 export interface ModuleSource {
   title: string;
@@ -11,7 +13,8 @@ export interface ModuleSource {
 
 export interface ModuleFile {
   format: 'visilearn.module';
-  version: 1;
+  /** 1 = lessons only; 2 = also carries data packs */
+  version: 1 | 2;
   id: string;
   title: string;
   description: string;
@@ -22,6 +25,8 @@ export interface ModuleFile {
   created: string;
   updated: string;
   scenes: { source: string }[];
+  /** data packs (pack definition language) used by this module's lessons — version 2 */
+  packs?: { source: string }[];
 }
 
 export interface ModuleLesson {
@@ -36,9 +41,14 @@ export interface ModuleCheck {
   errors: string[];
   warnings: string[];
   lessons: ModuleLesson[];
+  /** compiled data packs carried by the module */
+  packs: PackDef[];
+  /** built-ins + the module's packs: what its lessons compile and run against */
+  registry: PackRegistry;
 }
 
-export const MODULE_LIMITS = { maxScenes: 50, maxBytes: 256 * 1024, maxTitle: 120, maxTags: 12 };
+export const MODULE_LIMITS = { maxScenes: 50, maxPacks: 10, maxBytes: 256 * 1024, maxTitle: 120, maxTags: 12 };
+export const MODULE_VERSION = 2;
 const ID = /^[a-z0-9][a-z0-9-]{2,63}$/;
 
 function slug(title: string): string {
@@ -59,13 +69,15 @@ export interface ModuleInput {
   tags?: string[];
   sources?: ModuleSource[];
   scenes: string[];
+  /** data pack definitions (makes this a version 2 module) */
+  packs?: string[];
 }
 
 export function createModule(input: ModuleInput, opts: { id?: string; now?: number } = {}): ModuleFile {
   const at = new Date(opts.now ?? Date.now()).toISOString();
   return {
     format: 'visilearn.module',
-    version: 1,
+    version: input.packs?.length ? 2 : 1,
     id: opts.id ?? `${slug(input.title)}-${randomSuffix()}`,
     title: input.title.trim(),
     description: input.description ?? '',
@@ -76,6 +88,7 @@ export function createModule(input: ModuleInput, opts: { id?: string; now?: numb
     created: at,
     updated: at,
     scenes: input.scenes.map((source) => ({ source })),
+    ...(input.packs?.length ? { packs: input.packs.map((source) => ({ source })) } : {}),
   };
 }
 
@@ -83,18 +96,20 @@ export const serializeModule = (m: ModuleFile) => JSON.stringify(m, null, 2) + '
 
 const str = (v: unknown, d = '') => (typeof v === 'string' ? v : d);
 
-export function validateModule(data: unknown, registry: PackRegistry): ModuleCheck {
+export function validateModule(data: unknown, registry0: PackRegistry): ModuleCheck {
   const errors: string[] = [];
   const warnings: string[] = [];
   const lessons: ModuleLesson[] = [];
-  const fail = (): ModuleCheck => ({ module: null, errors, warnings, lessons });
+  const compiledPacks: PackDef[] = [];
+  let registry: PackRegistry = registry0;
+  const fail = (): ModuleCheck => ({ module: null, errors, warnings, lessons, packs: compiledPacks, registry });
 
   const d = data as Record<string, any>;
   if (!d || typeof d !== 'object' || d.format !== 'visilearn.module') {
     errors.push('This is not a visilearn module (missing "format": "visilearn.module").');
     return fail();
   }
-  if (typeof d.version !== 'number' || d.version > 1) {
+  if (typeof d.version !== 'number' || d.version > MODULE_VERSION) {
     errors.push(`This module needs a newer version of visilearn (module format v${d.version}).`);
     return fail();
   }
@@ -107,7 +122,24 @@ export function validateModule(data: unknown, registry: PackRegistry): ModuleChe
   const scenes = Array.isArray(d.scenes) ? d.scenes : [];
   if (!scenes.length) errors.push('Module needs at least one lesson.');
   if (scenes.length > MODULE_LIMITS.maxScenes) errors.push(`Module may contain at most ${MODULE_LIMITS.maxScenes} lessons.`);
+  const packSrcs = Array.isArray(d.packs) ? d.packs : [];
+  if (packSrcs.length > MODULE_LIMITS.maxPacks) errors.push(`Module may contain at most ${MODULE_LIMITS.maxPacks} packs.`);
   if (errors.length) return fail();
+
+  // packs first: lessons compile against built-ins + these packs
+  packSrcs.forEach((p: unknown, i: number) => {
+    const source = str((p as { source?: unknown })?.source);
+    const declared = /^\s*pack\s+(\S+)/m.exec(source)?.[1] ?? '?';
+    const label = `Pack ${i + 1} (${declared})`;
+    if (!source) { errors.push(`Pack ${i + 1}: missing source text.`); return; }
+    const r = compilePack(source, registry0);
+    for (const dg of r.diags) (dg.severity === 'error' ? errors : warnings).push(`${label}: L${dg.line} ${dg.msg}`);
+    if (!r.pack) return;
+    if (compiledPacks.some((x) => x.name === r.pack!.name)) { errors.push(`${label}: duplicate pack '${r.pack.name}' in this module.`); return; }
+    compiledPacks.push(r.pack);
+  });
+  if (errors.length) return fail();
+  registry = withPacks(registry0, compiledPacks);
 
   const seen = new Set<string>();
   scenes.forEach((s: unknown, i: number) => {
@@ -129,7 +161,7 @@ export function validateModule(data: unknown, registry: PackRegistry): ModuleChe
 
   const module: ModuleFile = {
     format: 'visilearn.module',
-    version: 1,
+    version: 1 as 1 | 2,
     id: d.id,
     title,
     description: str(d.description),
@@ -147,8 +179,10 @@ export function validateModule(data: unknown, registry: PackRegistry): ModuleChe
     created: str(d.created),
     updated: str(d.updated),
     scenes: scenes.map((s: { source: string }) => ({ source: s.source })),
+    ...(packSrcs.length ? { packs: packSrcs.map((p: { source: string }) => ({ source: p.source })) } : {}),
   };
-  return { module, errors, warnings, lessons };
+  if (packSrcs.length) module.version = 2;
+  return { module, errors, warnings, lessons, packs: compiledPacks, registry };
 }
 
 export function parseModule(text: string, registry: PackRegistry): ModuleCheck {
@@ -156,7 +190,7 @@ export function parseModule(text: string, registry: PackRegistry): ModuleCheck {
   try {
     data = JSON.parse(text);
   } catch {
-    return { module: null, errors: ['This is not a valid module file (it is not JSON).'], warnings: [], lessons: [] };
+    return { module: null, errors: ['This is not a valid module file (it is not JSON).'], warnings: [], lessons: [], packs: [], registry };
   }
   return validateModule(data, registry);
 }

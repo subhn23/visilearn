@@ -74,6 +74,13 @@ cheaply and for a human expert to review as a plain text diff.
 - Try a prompt (streamed) and check structured JSON output. Verified with `gemma4:12b` on Ollama.
 - API keys stay in this browser only and are never exported.
 
+**Open pack system: new topics without code**
+
+- Topic vocabularies (*packs*) are not a fixed list. Besides the built-in packs, a **data pack** written in the pack definition language adds kinds of things (with icons, colours and properties) and **macros**. For example, a `git` pack provides `commit c3 c2 main` and `merge m1 c2 f1 main`.
+- Data packs travel **inside modules**, so importing a module brings its vocabulary along. The Studio will generate them from your books. They are pure data, never code, so they are safe to share.
+- The built-in **`concept`** pack provides generic building blocks for any subject (`add`, `connect`, `point`, `set`, `flow`, `mark`, …), and learners can press **buttons** to act on the scene.
+- Try `examples/modules/git-basics.visilearn.json`: a Git module that carries its own `git` pack.
+
 **For authors**
 
 - A **token-efficient scene language**: no coordinates (layout is automatic), line-based syntax, domain vocabulary.
@@ -267,6 +274,7 @@ them at:
 
 | Tool | Purpose |
 |---|---|
+| `validate_pack(source)` | Compile a data pack definition; returns its kinds/macros or errors |
 | `get_vocab(packs?)` | Compact language cheat-sheet (≈400 tokens per pack). Load only what you need. |
 | `validate(source)` | Line-numbered errors and warnings with "did you mean" suggestions |
 | `simulate(source)` | Runs every step headlessly: packet outcomes, ask answers, goal status |
@@ -325,6 +333,8 @@ To keep logic testable without a browser, UI behaviour lives in **DOM-free view 
 | `linux.pack.test.ts` | `fs` language and errors, terminal, goals, events → effects, reset, tree layout |
 | `linux.termInput.test.ts` | terminal history and Tab behaviour |
 | `linux.scenes.test.ts` | every Linux challenge is solvable with its hint |
+| `packdef.test.ts` | data packs: definitions, errors, macros, hidden entities, buttons, concept goals, label layout |
+| `examples.test.ts` | example modules are valid and their button challenges are solvable |
 | `modules.*.test.ts` | module format & validation, share links, store, module cards, MODULES.md coverage |
 | `studio.sections.test.ts` / `studio.pdf.test.ts` | document sectioning; real PDFs in `pdfs/` (skipped when absent) |
 | `progress.test.ts` | persistence, corrupt/blocked storage, import merge, export round-trip |

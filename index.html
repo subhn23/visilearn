@@ -110,6 +110,9 @@
                       <p class="text-sm text-ink-soft" x-show="m.author" x-text="'by ' + m.author"></p>
                       <p class="mt-1 text-sm" x-show="m.description" x-text="m.description"></p>
                       <p class="mt-1 font-mono text-xs text-ink-soft" x-show="m.sources.length" x-text="'source: ' + m.sources.join('; ')"></p>
+                      <div class="mt-2 flex flex-wrap gap-1.5" x-show="m.packs.length">
+                        <template x-for="p in m.packs" :key="p.name"><span class="chip bg-lilac text-on-swatch" :title="p.about" x-text="'pack: ' + p.name"></span></template>
+                      </div>
                     </div>
                     <ol class="flex flex-col gap-1.5">
                       <template x-for="(l, i) in m.lessons" :key="l.key">
@@ -372,6 +375,15 @@
                     <p class="mt-2" x-show="check.module.description" x-text="check.module.description"></p>
                     <p class="mt-1 font-mono text-xs text-ink-soft" x-show="check.module.sources.length"
                       x-text="'source: ' + check.module.sources.map((s) => s.pages ? s.title + ', ' + s.pages : s.title).join('; ')"></p>
+                    <template x-if="packList.length">
+                      <div class="brut-flat mt-4 bg-lilac/40 px-3 py-2 text-sm">
+                        <p class="font-mono font-bold">Adds new topic vocabulary</p>
+                        <template x-for="p in packList" :key="p.name">
+                          <p><span class="font-mono font-bold" x-text="p.name"></span>: <span x-text="p.about"></span> <span class="font-mono text-xs text-ink-soft" x-text="'(' + p.kinds.join(', ') + ')'"></span></p>
+                        </template>
+                        <p class="mt-1 text-xs text-ink-soft">Packs are data only (kinds, icons, macros), never code.</p>
+                      </div>
+                    </template>
                     <div class="label-mono mt-4 mb-2" x-text="lessons.length + (lessons.length === 1 ? ' lesson' : ' lessons')"></div>
                     <ol class="flex flex-col gap-1.5">
                       <template x-for="(l, i) in lessons" :key="l.id">
@@ -452,7 +464,7 @@
                     <section class="brut overflow-hidden bg-card" x-show="!mainPanels">
                       <header class="win-bar bg-card-2"><span class="win-dots"><i class="bg-card"></i></span><span>event.log</span></header>
                       <ol class="max-h-52 overflow-auto px-4 py-2 font-mono text-[12.5px]" aria-live="polite">
-                        <li x-show="!log.length" class="py-1 text-ink-soft">$ waiting for packets…</li>
+                        <li x-show="!log.length" class="py-1 text-ink-soft">$ waiting for events…</li>
                         <template x-for="l in log" :key="l.id">
                           <li class="border-b border-dashed border-stroke/30 py-1"
                             :class="{ 'text-ok': l.tone === 'ok', 'text-bad': l.tone === 'bad', 'text-warn': l.tone === 'warn' }" x-text="l.msg"></li>
@@ -497,6 +509,18 @@
                             </template>
                           </div>
                           <p class="mt-2 min-h-6 font-mono text-sm font-bold" x-text="ask.feedback"></p>
+                        </div>
+                      </template>
+
+                      <!-- learner controls -->
+                      <template x-if="buttons.length">
+                        <div class="mt-4">
+                          <div class="label-mono mb-2">Try it</div>
+                          <div class="flex flex-wrap gap-2">
+                            <template x-for="(b, i) in buttons" :key="i">
+                              <button class="btn bg-sky text-on-swatch" @click="press(i)" :disabled="b.busy" x-text="b.label"></button>
+                            </template>
+                          </div>
                         </div>
                       </template>
 

@@ -50,12 +50,16 @@ src/core/          DOM-free engine (shared by web app, MCP server, tests)
   layout.ts          tidy tree layout for strict trees, layered layout otherwise (no coordinates in lessons)
   runtime.ts         createState, resetTransient, present, headlessFx, simulate
   types.ts           Scene, Entity, Step, PackDef, Effects, Runtime, CompileCtx
-src/packs/<name>/  one folder per pack
+src/packs/concept/ built-in `concept` pack + the DATA PACK system
+  core.ts            makeConceptPack: graph state, building blocks, goals (shared by all data packs)
+  packdef.ts         compilePack: pack definition language → PackDef (kinds, icons, macros); no code runs
+  icons.ts           icon library + validated path icons
+src/packs/<name>/  one folder per (code) pack
   index.ts           PackDef: entities, directives, verbs, parseGoal, icons, vocab, hooks
   sim.ts / shell.ts / vfs.ts   DOM-free simulators
   model/             DOM-free UI models (tested)
   ui.ts + panel.html Alpine components + template (registered in src/app/panels.ts)
-src/packs/index.ts registry of packs
+src/packs/index.ts builtinPacks + withPacks(base, dataPacks): the registry is per module, not fixed
 src/render/stage.ts SVG renderer implementing Effects (animation, runtime graph changes, cancellation)
 src/modules/       DOM-free module system (spec: docs/MODULES.md)
   format.ts          module v1: create/serialize/parse/validate, scene keys m:<module>/<scene>
@@ -97,9 +101,17 @@ docs/LANGUAGE.md   friendly language guide
 - `tests/grammar.test.ts` enforces that every keyword (core and pack) appears in GRAMMAR.md and that every `scene` example in it compiles.
 - **Changing the language** (parser, compile, or a pack's kinds/directives/verbs/goals) means updating GRAMMAR.md, bumping its version, adding a changelog row, and updating LANGUAGE.md, the pack `vocab` and this file if relevant.
 
+## Packs are open (not a fixed list)
+
+- Two kinds of pack: **built-in code packs** (`net`, `linux`, `concept`: deep simulators) and **data packs** (pack definition language, GRAMMAR.md §6), which the Studio writes and modules carry. Data packs never execute code: kinds, validated icons, props and macros over the concept building blocks only.
+- Always compile lessons against the right registry: `registryFor(sceneKey)` in the app, `validateModule(...).registry` for modules. Never assume `builtinPacks` for module lessons.
+- Data packs can't reuse built-in names. Packs of the concept family share one graph state (`stateKey`).
+- New core step lines or pack keywords → update GRAMMAR.md (the test enforces it).
+
 ## Modules
 
 - Spec: `docs/MODULES.md`. Change the format → update the spec (version + changelog); a test checks every field is documented.
+- Modules may carry `packs` (format v2); they compile before the lessons.
 - Module lessons are addressed as `m:<moduleId>/<sceneId>`; `byId()` in `src/app/scenes.ts` resolves both built-in and module lessons.
 - Saved modules load from IndexedDB **before** `Alpine.start()` (top-level await in `main.ts`) so `#/s/m:…` URLs open directly.
 - Never put Alpine-proxied objects into IndexedDB: save a plain copy (`JSON.parse(JSON.stringify(x))`).

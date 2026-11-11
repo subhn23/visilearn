@@ -14,7 +14,12 @@ const PAD_Y = 80;
  * (clients on the left, servers on the right). `col=N` overrides a column.
  */
 export function layoutScene(scene: Scene, registry: PackRegistry): Layout {
-  return treeLayout(scene) ?? layeredLayout(scene, registry);
+  // entities created later by an action (hidden) are not drawn yet
+  const visible = scene.entities.filter((e) => !e.hidden);
+  const ids = new Set(visible.map((e) => e.id));
+  const s = { ...scene, entities: visible, links: scene.links.filter(([a, b]) => ids.has(a) && ids.has(b)) };
+  const hasLabels = visible.some((e) => registry[e.pack]?.entities[e.kind]?.role === 'label');
+  return (hasLabels ? null : treeLayout(s)) ?? layeredLayout(s, registry);
 }
 
 const TREE_ROW = 118;
@@ -65,6 +70,9 @@ function layeredLayout(scene: Scene, registry: PackRegistry): Layout {
   };
   const adj = new Map<string, string[]>(ents.map((e) => [e.id, []]));
   for (const [a, b] of scene.links) { adj.get(a)!.push(b); adj.get(b)!.push(a); }
+  // label-role nodes (branches, HEAD, tags) don't get their own column: they stack on their target
+  const isLabel = (id: string) => { const e = ents[order.get(id)!]; return registry[e.pack]?.entities[e.kind]?.role === 'label'; };
+  const core = (id: string) => adj.get(id)!.filter((n) => !isLabel(n));
 
   // connected components
   const comp = new Map<string, number>();
@@ -84,19 +92,35 @@ function layeredLayout(scene: Scene, registry: PackRegistry): Layout {
       rank.set(members[0], tier(members[0]));
       continue;
     }
-    // BFS from the first-declared lowest-tier entity…
-    const minTier = Math.min(...members.map(tier));
-    const root = members.find((id) => tier(id) === minTier)!;
-    const q = [root];
-    rank.set(root, 0);
-    while (q.length) {
-      const id = q.shift()!;
-      for (const n of adj.get(id)!) if (!rank.has(n)) { rank.set(n, rank.get(id)! + 1); q.push(n); }
+    const bodies = members.filter((id) => !isLabel(id));
+    const labels = members.filter(isLabel);
+    if (bodies.length) {
+      // BFS from the first-declared lowest-tier entity (labels excluded)…
+      const minTier = Math.min(...bodies.map(tier));
+      const starts = [bodies.find((id) => tier(id) === minTier)!, ...bodies];
+      for (const root of starts) {
+        if (rank.has(root)) continue;
+        const q = [root];
+        rank.set(root, 0);
+        while (q.length) {
+          const id = q.shift()!;
+          for (const n of core(id)) if (!rank.has(n)) { rank.set(n, rank.get(id)! + 1); q.push(n); }
+        }
+      }
     }
+    // …labels take the column of what they point at (chains like HEAD → main → commit stack up)
+    for (let pass = 0; pass < labels.length + 1; pass++) {
+      for (const id of labels) {
+        if (rank.has(id)) continue;
+        const target = adj.get(id)!.find((n) => rank.has(n));
+        if (target) rank.set(id, rank.get(target)!);
+      }
+    }
+    for (const id of labels) if (!rank.has(id)) rank.set(id, 0);
     // …then pull low-tier leaves (clients, Internet) to the left of what they connect to.
-    for (const id of members) {
-      const ns = adj.get(id)!;
-      if (ns.length === 1 && tier(id) < tier(ns[0]) && rank.get(ns[0])! > 0) rank.set(id, rank.get(ns[0])! - 1);
+    for (const id of bodies) {
+      const ns = core(id);
+      if (ns.length === 1 && adj.get(id)!.length === 1 && tier(id) < tier(ns[0]) && rank.get(ns[0])! > 0) rank.set(id, rank.get(ns[0])! - 1);
     }
   }
   for (const e of ents) if (e.props.col && /^\d+$/.test(e.props.col)) rank.set(e.id, parseInt(e.props.col, 10) - 1);
@@ -118,6 +142,25 @@ function layeredLayout(scene: Scene, registry: PackRegistry): Layout {
       cols[c].sort((a, b) => bc(a) - bc(b) || order.get(a)! - order.get(b)!);
       assign();
     }
+  }
+
+  // stack label chains directly above their target, outermost on top (HEAD over main over c3)
+  const targetOf = new Map<string, string | undefined>();
+  for (const e of ents) {
+    if (!isLabel(e.id)) continue;
+    const nb = adj.get(e.id)!;
+    targetOf.set(e.id, nb.find((n) => !isLabel(n)) ?? nb.find((n) => isLabel(n)));
+  }
+  if (targetOf.size) {
+    for (let c = 0; c < cols.length; c++) {
+      const col = cols[c];
+      const placed = new Set<string>();
+      const above = (n: string): string[] =>
+        col.filter((l) => isLabel(l) && !placed.has(l) && targetOf.get(l) === n).flatMap((l) => { placed.add(l); return [...above(l), l]; });
+      const ordered = col.filter((id) => !isLabel(id)).flatMap((b) => [...above(b), b]);
+      cols[c] = [...ordered, ...col.filter((id) => !ordered.includes(id))];
+    }
+    assign();
   }
 
   const maxRows = Math.max(1, ...cols.map((c) => c.length));

@@ -1,0 +1,25 @@
+scene git.commits "Commits are snapshots"
+about "A commit saves your whole project and remembers the commit before it."
+use git
+
+commit c1 message="first draft"
+branch main
+head here label="HEAD"
+link here main
+link main c1
+
+step "One commit"
+  say "A commit is a snapshot of every file at one moment, plus a short message."
+  highlight c1
+  note c1 "snapshot + message"
+
+step "Committing again"
+  ask "When you commit again, what does the new commit point to?" "Nothing" "Its parent, c1" "Every older commit" answer=2
+  commit c2 c1 main
+  say "The new commit links to its parent, and main moved forward on its own."
+
+step "Your turn"
+  say "Make two more commits on main."
+  button "git commit" commit c3 c2 main
+  button "git commit (again)" commit c4 c3 main
+  goal count commit = 4, linked main c4

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createModule, MODULE_LIMITS, parseModule, sceneKey, serializeModule, splitSceneKey, validateModule } from '../src/modules/format.ts';
+import { createModule, MODULE_LIMITS, MODULE_VERSION, parseModule, sceneKey, serializeModule, splitSceneKey, validateModule } from '../src/modules/format.ts';
 import { packs } from '../src/packs/index.ts';
 
 const LESSON_A = `scene net.hello "Hello network"
@@ -41,7 +41,7 @@ test('a valid module round-trips through serialize/parse', () => {
 test('shape errors are reported in plain language', () => {
   assert.match(parseModule('not json', packs).errors[0], /not a valid module file/i);
   assert.match(validateModule({ hello: 1 }, packs).errors[0], /not a visilearn module/i);
-  const newer = { ...make(), version: 2 };
+  const newer = { ...make(), version: MODULE_VERSION + 1 };
   assert.match(validateModule(newer, packs).errors[0], /newer version of visilearn/);
   const noTitle = { ...make(), title: '  ' };
   assert.ok(validateModule(noTitle, packs).errors.some((e) => /title/.test(e)));
@@ -85,7 +85,30 @@ test('scene keys namespace module lessons', () => {
 test('docs/MODULES.md specifies the current format version and every field', async () => {
   const { readFileSync } = await import('node:fs');
   const doc = readFileSync(new URL('../docs/MODULES.md', import.meta.url), 'utf8');
-  assert.match(doc, /Module format version: 1\b/);
-  for (const key of Object.keys(make())) assert.ok(doc.includes(`\`${key}\``), `MODULES.md is missing field \`${key}\``);
+  assert.match(doc, new RegExp(`Module format version: ${MODULE_VERSION}\\b`));
+  for (const key of [...Object.keys(make()), 'packs']) assert.ok(doc.includes(`\`${key}\``), `MODULES.md is missing field \`${key}\``);
   assert.match(doc, /#\/import\//, 'share-link scheme documented');
+});
+
+test('modules can carry their own packs; such modules are format version 2', async () => {
+  const { GIT_PACK } = await import('./packdef.test.ts');
+  const lesson = `scene git.one "One"
+use git
+commit c1
+step "s"
+  flash c1 ok`;
+  const m = createModule({ title: 'Git', packs: [GIT_PACK], scenes: [lesson] }, { id: 'git-mod-0001', now: 1 });
+  assert.equal(m.version, 2);
+  const r = validateModule(m, packs);
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.packs.map((p) => p.name), ['git']);
+  assert.ok(r.registry.git, 'module registry includes its packs');
+  // without the pack, the lesson cannot compile
+  const r2 = validateModule({ ...m, packs: [] }, packs);
+  assert.ok(r2.errors.some((e) => /unknown pack 'git'/.test(e)));
+  // pack problems are reported with the pack's position
+  const r3 = validateModule({ ...m, packs: [{ source: 'pack linux "x"' }] }, packs);
+  assert.ok(r3.errors.some((e) => /^Pack 1 \(linux\): L1 .*built-in/.test(e)), r3.errors.join('\n'));
+  const r4 = validateModule({ ...m, packs: [{ source: GIT_PACK }, { source: GIT_PACK }] }, packs);
+  assert.ok(r4.errors.some((e) => /duplicate pack 'git'/.test(e)));
 });

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { compile, CORE_TOP, CORE_VERBS } from '../src/core/index.ts';
+import { compilePack, PACKDEF_KEYWORDS } from '../src/packs/concept/packdef.ts';
 import { packs } from '../src/packs/index.ts';
 
 const grammar = readFileSync(new URL('../docs/GRAMMAR.md', import.meta.url), 'utf8');
@@ -36,5 +37,16 @@ test('every ```scene example in the grammar compiles without errors', () => {
   for (const [i, src] of examples.entries()) {
     const { scene, diags } = compile(src, packs);
     assert.ok(scene, `example ${i + 1}: ${diags.map((d) => `L${d.line} ${d.msg}`).join('; ')}`);
+  }
+});
+
+test('the pack definition language is specified and its examples compile', () => {
+  const missing = PACKDEF_KEYWORDS.filter((k) => !mentioned(k));
+  assert.deepEqual(missing, []);
+  const examples = [...grammar.matchAll(/```pack\n([\s\S]*?)```/g)].map((m) => m[1]);
+  assert.ok(examples.length >= 1, 'grammar should contain a ```pack example');
+  for (const [i, src] of examples.entries()) {
+    const { pack, diags } = compilePack(src, packs);
+    assert.ok(pack, `pack example ${i + 1}: ${diags.map((d) => `L${d.line} ${d.msg}`).join('; ')}`);
   }
 });

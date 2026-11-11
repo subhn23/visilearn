@@ -22,6 +22,10 @@ export function registerImporter(alpine: Alpine) {
       this.loading = false;
     },
 
+    get packList() {
+      return (this.check?.packs ?? []).map((p) => ({ name: p.name, about: p.about, kinds: Object.keys(p.entities) }));
+    },
+
     get lessons() {
       return (this.check?.lessons ?? []).map((l) => ({ id: l.sceneId, title: l.title, steps: l.steps }));
     },

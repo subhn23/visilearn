@@ -1,6 +1,6 @@
 # visilearn Modules: Format Specification
 
-Module format version: 1
+Module format version: 2
 Status: normative. `tests/modules.format.test.ts` checks that every field below is documented.
 
 A **module** is a portable bundle of lessons. It can be saved on the device ("My modules"),
@@ -17,7 +17,7 @@ what makes modules from strangers safe to open.
 ```json
 {
   "format": "visilearn.module",
-  "version": 1,
+  "version": 2,
   "id": "git-basics-k3x9qa",
   "title": "Git basics",
   "description": "Commits, branches and merges, step by step.",
@@ -27,7 +27,8 @@ what makes modules from strangers safe to open.
   "sources": [{ "title": "Git Notes for Professionals", "pages": "pp. 11-25", "license": "CC BY-SA" }],
   "created": "2026-11-11T10:00:00.000Z",
   "updated": "2026-11-11T10:00:00.000Z",
-  "scenes": [{ "source": "scene net.hello \"Hello\"\nuse net\n…" }]
+  "scenes": [{ "source": "scene git.commits \"Commits\"\nuse git\n…" }],
+  "packs": [{ "source": "pack git \"Git basics\"\nkind commit icon=circle\n…" }]
 }
 ```
 
@@ -46,6 +47,7 @@ what makes modules from strangers safe to open.
 | `sources` | object[] | no | Where the content came from: `{ title, pages?, url?, license? }`. Shown to learners and reviewers. Generated modules must record their sources. |
 | `created` | string | no | ISO 8601 timestamp. |
 | `updated` | string | no | ISO 8601 timestamp. |
+| `packs` | object[] | no | **Version 2.** 0–10 data packs, each `{ "source": "<pack definition text>" }` ([GRAMMAR.md §6](GRAMMAR.md)). They are compiled first, and the module's lessons then compile against the built-in packs plus these. Names must not clash with built-in packs or with each other. Packs are data only (kinds, icons, props, macros) and are never executed as code. A module that carries packs is written as `version: 2`. |
 | `scenes` | object[] | yes | 1–50 lessons, each `{ "source": "<scene language text>" }`. Every source must compile without errors, and lesson ids (`scene <id>`) must be unique within the module. |
 
 Unknown fields are **ignored and dropped** on import, so they never reach storage or the UI.
@@ -74,17 +76,20 @@ payload = base64url( deflate-raw( UTF-8 JSON of the module ) )
 ## Import rules
 
 1. Parse JSON. If that fails, the file is "not a valid module file".
-2. Check the envelope (`format`, `version`, size, `id`, `title`, lesson count).
-3. Compile every lesson. Errors are reported as `Lesson <n> (<scene id>): L<line> <message>`, and warnings are shown but don't block.
-4. Show the review screen. The user chooses **Add to My modules**; nothing is saved before that.
+2. Check the envelope (`format`, `version`, size, `id`, `title`, lesson and pack counts).
+3. Compile every pack (`Pack <n> (<name>): L<line> <message>`), then build the module's registry: built-ins plus its packs.
+4. Compile every lesson against that registry. Errors are reported as `Lesson <n> (<scene id>): L<line> <message>`, and warnings are shown but don't block.
+5. Show the review screen, listing the packs the module adds. The user chooses **Add to My modules**; nothing is saved before that.
 
 ## Versioning
 
-Additive, backwards-compatible changes (new optional fields) keep version 1 and are listed in
-the changelog. Breaking changes bump `version`. The app must keep reading every older version.
+Additive changes that old readers can safely ignore keep the version number. Changes that old
+readers would mis-handle (like `packs`, without which lessons would not compile) bump `version`,
+so older apps say "needs a newer version" instead of failing confusingly. The app must keep reading every older version.
 
 ## Changelog
 
 | Version | Change |
 |---|---|
+| 2 | Optional `packs`: modules can carry data packs (new topic vocabulary). Readers must still accept version 1. |
 | 1 | Initial format: envelope, sources, lessons as scene-language text, share links. |

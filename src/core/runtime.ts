@@ -2,17 +2,32 @@ import type { Effects, PackRegistry, Runtime, Scene, Tone } from './types.ts';
 
 export function createState(scene: Scene, registry: PackRegistry): Record<string, any> {
   const state: Record<string, any> = {};
-  for (const name of scene.packs) state[name] = registry[name].initState?.(scene) ?? {};
+  for (const name of scene.packs) {
+    const p = registry[name];
+    if (p.stateKey) state[name] = state[p.stateKey] ??= p.initState?.(scene) ?? {}; // shared by the family
+    else state[name] = p.initState?.(scene) ?? {};
+  }
   return state;
 }
 
+/** each distinct state object once (packs in a family share one) */
+function eachState(rt: Runtime, registry: PackRegistry, fn: (p: PackRegistry[string], st: any) => void) {
+  const seen = new Set<unknown>();
+  for (const name of rt.scene.packs) {
+    const st = rt.state[name];
+    if (seen.has(st)) continue;
+    seen.add(st);
+    fn(registry[name], st);
+  }
+}
+
 export function resetTransient(rt: Runtime, registry: PackRegistry) {
-  for (const name of rt.scene.packs) registry[name].resetTransient?.(rt.state[name]);
+  eachState(rt, registry, (p, st) => p.resetTransient?.(st));
 }
 
 /** let packs draw their starting state (after reset, before steps replay) */
 export function present(rt: Runtime, registry: PackRegistry) {
-  for (const name of rt.scene.packs) registry[name].present?.(rt.state[name], rt.fx);
+  eachState(rt, registry, (p, st) => p.present?.(st, rt.fx));
 }
 
 export interface LogEntry { msg: string; tone?: Tone }
@@ -31,6 +46,8 @@ export function headlessFx(log?: LogEntry[]): Effects {
     setSub: () => {},
     addNode: () => {},
     removeNode: () => {},
+    link: () => {},
+    unlink: () => {},
   };
 }
 

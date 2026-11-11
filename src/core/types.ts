@@ -31,6 +31,8 @@ export interface Entity {
   sub?: string;
   props: Record<string, string>;
   line: number;
+  /** created later by an action (e.g. `add`); not drawn until then */
+  hidden?: boolean;
 }
 
 export interface Ask {
@@ -61,6 +63,8 @@ export interface Step {
   actions: Action[];
   asks: Ask[];
   goals: Goal[];
+  /** learner-triggered actions: `button "Label" <action>` */
+  buttons: { line: number; label: string; action: Action }[];
 }
 
 export interface Scene {
@@ -100,6 +104,9 @@ export interface Effects {
   addNode(e: Entity, linkTo?: string): void;
   /** removes the node and everything whose id starts with `${id}/` */
   removeNode(id: string): void;
+  /** add / remove a link between two existing nodes */
+  link(a: string, b: string): void;
+  unlink(a: string, b: string): void;
 }
 
 export interface Runtime {
@@ -122,6 +129,10 @@ export interface CompileCtx {
   /** packs may generate entities (e.g. a filesystem tree); returns false on duplicate id */
   addEntity(e: Entity): boolean;
   addLink(a: string, b: string): void;
+  /** find an entity kind among the scene's packs */
+  kindOf(kind: string): { pack: string; def: EntityKind } | null;
+  /** compile one action line (core action or pack verb) — used by macros */
+  compileAction(head: string, args: Token[], line: number): Action | null;
 }
 
 export interface EntityKind {
@@ -136,6 +147,10 @@ export interface EntityKind {
   swatch?: string;
   /** set when entities of this kind are created by a directive (e.g. fs) and cannot be declared directly */
   generatedBy?: string;
+  /** prop shown as the node's sub-label (e.g. show=status) */
+  show?: string;
+  /** 'label': a pointer-like node (branch, HEAD, tag) drawn in the column of what it points at */
+  role?: 'label';
 }
 
 export interface VerbDef {
@@ -152,6 +167,10 @@ export interface DirectiveDef {
 
 export interface PackDef {
   name: string;
+  /** packs with the same stateKey share one state object (e.g. the concept family's graph) */
+  stateKey?: string;
+  /** where the pack came from: built into the app, or a data pack (module / Studio) */
+  origin?: 'builtin' | 'data';
   about: string;
   entities: Record<string, EntityKind>;
   directives?: Record<string, DirectiveDef>;

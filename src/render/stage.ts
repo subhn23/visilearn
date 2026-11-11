@@ -65,7 +65,9 @@ export class Stage implements Effects {
 
   constructor(scene: Scene, registry: PackRegistry) {
     this.registry = registry;
-    this.base = { entities: [...scene.entities], links: [...scene.links] };
+    const visible = scene.entities.filter((e) => !e.hidden);
+    const ids = new Set(visible.map((e) => e.id));
+    this.base = { entities: visible, links: scene.links.filter(([a, b]) => ids.has(a) && ids.has(b)) };
     this.svg = el('svg', { class: 'stage-svg', role: 'img', 'aria-label': scene.title });
     this.gLinks = el('g', { class: 'links' }, this.svg);
     this.gDecor = el('g', { class: 'decor' }, this.svg);
@@ -209,9 +211,10 @@ export class Stage implements Effects {
   addNode(e: Entity, linkTo?: string) {
     if (this.nodes.has(e.id)) return;
     this.dirty = true;
-    this.entities.push(e);
+    const shown = { ...e, hidden: false };
+    this.entities.push(shown);
     if (linkTo && this.nodes.has(linkTo)) { this.links.push([linkTo, e.id]); this.makeLink(linkTo, e.id); }
-    const v = this.makeNode(e);
+    const v = this.makeNode(shown);
     if (!this.instant) v.g.classList.add('appear');
     this.relayout();
   }
@@ -227,6 +230,27 @@ export class Stage implements Effects {
       const keep = !gone(l.a) && !gone(l.b);
       if (!keep) { l.line.remove(); l.pa.remove(); l.pb.remove(); }
       return keep;
+    });
+    this.relayout();
+  }
+
+  link(a: string, b: string) {
+    if (!this.nodes.has(a) || !this.nodes.has(b) || this.links.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) return;
+    this.dirty = true;
+    this.links.push([a, b]);
+    this.makeLink(a, b);
+    this.relayout();
+  }
+
+  unlink(a: string, b: string) {
+    const match = (x: string, y: string) => (x === a && y === b) || (x === b && y === a);
+    if (!this.links.some(([x, y]) => match(x, y))) return;
+    this.dirty = true;
+    this.links = this.links.filter(([x, y]) => !match(x, y));
+    this.linkViews = this.linkViews.filter((l) => {
+      if (!match(l.a, l.b)) return true;
+      l.line.remove(); l.pa.remove(); l.pb.remove();
+      return false;
     });
     this.relayout();
   }

@@ -1,0 +1,20 @@
+pack git "Git basics"
+about "Commits, branches and merges, the way Git really stores them."
+kind commit icon=circle swatch=mustard tier=1 show=message about="A saved snapshot of the whole project. Each commit remembers its parent."
+  prop message "what changed"
+kind branch icon=tag swatch=mint tier=0 role=label about="A branch is only a movable label that points at one commit."
+kind head icon=flag swatch=rose tier=0 role=label about="HEAD marks the branch you are working on right now."
+macro commit ID PARENT BRANCH
+  add commit ID to PARENT
+  point BRANCH ID
+  flash ID ok
+macro branch NAME AT
+  add branch NAME
+  point NAME AT
+macro switch HEAD_ID BRANCH
+  point HEAD_ID BRANCH
+macro merge ID INTO FROM BRANCH
+  add commit ID to INTO message="merge"
+  connect FROM ID
+  point BRANCH ID
+  flash ID ok

@@ -1,0 +1,30 @@
+scene git.branches "Branches are just labels"
+about "Creating a branch copies nothing: it adds a label that moves when you commit."
+use git
+
+commit c1 message="start"
+commit c2 message="add menu"
+branch main
+head here label="HEAD"
+link c1 c2
+link here main
+link main c2
+
+step "A branch is a label"
+  highlight main
+  note main "points at c2"
+
+step "Create a branch"
+  ask "git branch feature: how much gets copied?" "All the files" "Only the newest commit" "Nothing: it is a new label" answer=3
+  branch feature c2
+
+step "Switch and commit"
+  switch here feature
+  commit f1 c2 feature
+  say "Only feature moved forward. main still points at c2."
+
+step "Your turn: merge"
+  say "Bring the work from feature back into main."
+  hint "A merge commit has two parents: c2 (main) and f1 (feature)."
+  button "git merge feature" merge m1 c2 f1 main
+  goal linked m1 f1, linked main m1

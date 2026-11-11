@@ -205,16 +205,13 @@
                       </header>
                       <div class="grid-paper overflow-x-auto p-2 sm:p-4" x-ref="stage"></div>
                       <footer class="flex flex-wrap gap-x-5 gap-y-1 border-t-2 border-stroke bg-card-2 px-3 py-2 font-mono text-[11px] text-ink-soft">
-                        <span class="flex items-center gap-1.5"><i class="h-3 w-3 rounded-full border-2 border-stroke bg-mustard"></i>packet</span>
-                        <span class="flex items-center gap-1.5"><i class="h-3 w-3 rounded-full border-2 border-stroke bg-ok"></i>delivered</span>
-                        <span class="flex items-center gap-1.5"><i class="h-3 w-3 rounded-full border-2 border-stroke bg-bad"></i>dropped</span>
-                        <span class="flex items-center gap-1.5"><i class="h-3 w-3 rounded-full border-2 border-stroke bg-warn"></i>refused</span>
-                        <span class="flex items-center gap-1.5"><i class="h-3 w-3 rounded-full border-2 border-dashed border-stroke bg-sky"></i>reply</span>
-                        <span class="ml-auto hidden sm:inline">click a device to inspect it</span>
+                        <template x-for="l in legend" :key="l.label"><span class="flex items-center gap-1.5"><i class="h-3 w-3" :class="l.dot"></i><span x-text="l.label"></span></span></template>
+                        <span class="ml-auto hidden sm:inline">click anything to inspect it</span>
                       </footer>
                     </section>
 
-                    <section class="brut overflow-hidden bg-card">
+                    <div x-show="mainPanels" x-html="mainPanels"></div>
+                    <section class="brut overflow-hidden bg-card" x-show="!mainPanels">
                       <header class="win-bar bg-card-2"><span class="win-dots"><i class="bg-card"></i></span><span>event.log</span></header>
                       <ol class="max-h-52 overflow-auto px-4 py-2 font-mono text-[12.5px]" aria-live="polite">
                         <li x-show="!log.length" class="py-1 text-ink-soft">$ waiting for packets…</li>
@@ -310,15 +307,16 @@
                           <button class="ml-1 font-bold" @click="closeInspector()" aria-label="Close">✕</button>
                         </header>
                         <div class="p-4 text-sm">
-                          <p class="font-mono text-xs text-ink-soft" x-show="inspector.sub" x-text="inspector.sub"></p>
+                          <p class="font-mono text-xs text-ink-soft" x-show="inspector.sub && !inspector.details.length" x-text="inspector.sub"></p>
                           <p class="font-mono text-xs text-ink-soft" x-show="inspector.ports" x-text="'listening on ' + inspector.ports"></p>
+                          <template x-for="d in inspector.details"><p class="font-mono text-xs text-ink-soft" x-text="d"></p></template>
                           <p class="mt-2" x-text="inspector.about"></p>
                         </div>
                       </section>
                     </template>
 
                     <!-- pack panels (rules editor, packet lab, …) -->
-                    <div x-html="panelHtml"></div>
+                    <div x-html="sidePanels"></div>
                   </aside>
                 </div>
               </div>

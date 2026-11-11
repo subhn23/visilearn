@@ -14,6 +14,49 @@ const PAD_Y = 80;
  * (clients on the left, servers on the right). `col=N` overrides a column.
  */
 export function layoutScene(scene: Scene, registry: PackRegistry): Layout {
+  return treeLayout(scene) ?? layeredLayout(scene, registry);
+}
+
+const TREE_ROW = 118;
+
+/**
+ * Tidy tree layout, used when links form a strict parent→child tree (e.g. a filesystem):
+ * depth = column, leaves take successive rows in declaration order, each parent is centred
+ * on its children. Gives a crossing-free, stable picture.
+ */
+function treeLayout(scene: Scene): Layout | null {
+  const ents = scene.entities;
+  if (ents.length < 2 || scene.links.length !== ents.length - 1) return null;
+  const kids = new Map<string, string[]>(ents.map((e) => [e.id, []]));
+  const hasParent = new Set<string>();
+  for (const [a, b] of scene.links) {
+    if (!kids.has(a) || !kids.has(b) || hasParent.has(b)) return null;
+    hasParent.add(b);
+    kids.get(a)!.push(b);
+  }
+  const roots = ents.filter((e) => !hasParent.has(e.id));
+  if (roots.length !== 1) return null;
+
+  const rowOf = new Map<string, number>();
+  const depthOf = new Map<string, number>();
+  let leaves = 0;
+  const place = (id: string, depth: number) => {
+    depthOf.set(id, depth);
+    const ch = kids.get(id)!;
+    if (!ch.length) { rowOf.set(id, leaves++); return; }
+    for (const c of ch) place(c, depth + 1);
+    rowOf.set(id, (rowOf.get(ch[0])! + rowOf.get(ch[ch.length - 1])!) / 2);
+  };
+  place(roots[0].id, 0);
+  if (rowOf.size !== ents.length) return null; // not connected
+
+  const maxDepth = Math.max(...depthOf.values());
+  const pos = new Map<string, Pos>();
+  for (const e of ents) pos.set(e.id, { x: PAD_X + depthOf.get(e.id)! * COL_W, y: PAD_Y + rowOf.get(e.id)! * TREE_ROW });
+  return { pos, width: PAD_X * 2 + maxDepth * COL_W, height: PAD_Y * 2 + (leaves - 1) * TREE_ROW };
+}
+
+function layeredLayout(scene: Scene, registry: PackRegistry): Layout {
   const ents = scene.entities;
   const order = new Map(ents.map((e, i) => [e.id, i]));
   const tier = (id: string) => {

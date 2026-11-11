@@ -1,5 +1,5 @@
 import type { Alpine } from 'alpinejs';
-import { createState, resetTransient } from '../../core/runtime.ts';
+import { createState, present, resetTransient } from '../../core/runtime.ts';
 import type { Ask, Entity, Runtime, Scene, Tone } from '../../core/types.ts';
 import { packs } from '../../packs/index.ts';
 import { Stage } from '../../render/stage.ts';
@@ -36,7 +36,9 @@ export function registerPlayer(alpine: Alpine) {
       found: !!scene,
       title: scene?.title ?? 'Topic not found',
       steps: scene?.steps.map((s) => s.text) ?? [],
-      panelHtml: scene ? scene.packs.map((p) => panels[p]?.html ?? '').join('') : '',
+      sidePanels: scene ? scene.packs.filter((p) => panels[p]?.slot === 'side').map((p) => panels[p].html).join('') : '',
+      legend: scene ? scene.packs.flatMap((p) => panels[p]?.legend ?? []) : [],
+      mainPanels: scene ? scene.packs.filter((p) => panels[p]?.slot === 'main').map((p) => panels[p].html).join('') : '',
       idx: 0,
       text: '',
       say: [] as string[],
@@ -46,7 +48,7 @@ export function registerPlayer(alpine: Alpine) {
       status: { tone: 'idle', text: '' } as ReturnType<typeof stepStatus>,
       done: [] as number[],
       log: [] as { id: number; msg: string; tone: Tone }[],
-      inspector: null as null | { label: string; kind: string; sub: string; ports: string; about: string; swatch: string },
+      inspector: null as null | { label: string; kind: string; sub: string; ports: string; about: string; swatch: string; details: string[] },
       speed: 1,
 
       /** for nested pack panels */
@@ -96,6 +98,7 @@ export function registerPlayer(alpine: Alpine) {
         this.inspector = {
           label: e.label, kind: e.kind, sub: e.sub ?? '', ports: e.props.port ?? '',
           about: e.props.info ?? kind.about, swatch: kind.swatch ?? 'sky',
+          details: packs[e.pack].describe?.(live.state[e.pack], e.id) ?? [],
         };
       },
 
@@ -160,6 +163,7 @@ export function registerPlayer(alpine: Alpine) {
         correct = new Set();
         stage.reset();
         resetTransient(live, packs);
+        present(live, packs);
         // fast-forward through earlier steps without animation (a failed device stays down)
         stage.instant = true;
         for (const s of scene.steps.slice(0, i)) for (const a of s.actions) await a.run(replay);

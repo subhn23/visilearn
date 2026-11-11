@@ -119,6 +119,7 @@ export async function runCommand(rt: Runtime, line: string, opts: { learner: boo
     fx.badge(st.shell.cwd, HERE);
     st.badged = st.shell.cwd;
   }
+  st.term.notify(); // the prompt may have changed (cd prints nothing)
 }
 
 // ---- compile helpers -----------------------------------------------------------------

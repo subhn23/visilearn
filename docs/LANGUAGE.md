@@ -77,6 +77,46 @@ Goals: `A->B:PORT ok|blocked|refused|unreachable`, `A->B ping ok`.
 
 When a firewall has `editable` rules, the learner gets a **live rule editor** and a **packet lab**.
 
+## Pack: `linux`
+
+The whole filesystem is declared as **one indented tree**: folders end with `/`, and each node
+becomes an entity whose id is its absolute path (`/home/asha/notes.txt`).
+
+```
+fs as=asha [cwd=/path] [show=perms]      # one per scene
+  home/
+    asha/
+      notes.txt "one line of content"
+      deploy.sh mode=644                 # mode=755, owner=root
+        | echo Deploying                 # multi-line content
+        | echo Done
+  etc/
+    hosts "127.0.0.1 localhost"
+  tmp/
+```
+
+- Owners: anything under `/home/<as>` belongs to that user; everything else belongs to root.
+- Default modes: folders 755, files 644, `/tmp` 777. `show=perms` prints the mode under each node.
+- The tree is drawn with a tidy, crossing-free layout. The current directory carries a **you are here** badge.
+
+Actions and goals:
+
+```
+run "ls -l"                 # typed into the terminal, then executed (scripted)
+highlight /etc/hosts        # paths are entity ids
+goal cwd /etc
+goal exists /tmp/b.txt      goal missing /home/asha/notes.txt
+goal mode /home/asha/deploy.sh 755
+goal ran cat                # the learner ran it (scripted runs don't count)
+goal output "localhost"     # the learner's latest output contains the text
+goal contains /tmp/b.txt "milk"
+```
+
+Supported commands: `pwd ls [-l -a] cd cat echo touch mkdir [-p] rm [-r] mv cp [-r] chmod
+grep [-v -c -i] wc -l head -n whoami sudo help clear`, plus `./script.sh`, pipes `|` and
+`>` / `>>` redirects. Permissions are enforced: no `x` bit means `Permission denied`, and only the
+owner or root may change a file. The learner's terminal has history (↑ ↓) and Tab completion.
+
 ## Adding a pack
 
 A pack is a DOM-free `PackDef` (`src/packs/<name>/index.ts`) plus an optional DOM side panel
@@ -84,9 +124,11 @@ A pack is a DOM-free `PackDef` (`src/packs/<name>/index.ts`) plus an optional DO
 
 - `entities`: kinds, layout tier, about-text, allowed props
 - `directives`: top-level blocks like `rules`
-- `verbs`: step actions; each compiles to `{ run(rt) }` and uses `rt.fx` for visuals (`travel`, `flash`, `note`, `setDown`, `log`)
+- `verbs`: step actions; each compiles to `{ run(rt) }` and uses `rt.fx` for visuals (`travel`, `flash`, `note`, `setDown`, `log`, and for graphs that change at runtime `addNode`, `removeNode`, `badge`, `setSub`)
 - `parseGoal`: goal syntax and a `check(rt)` against the simulator
 - `icons`: 48×48 SVG per kind
+- `present` / `describe` (optional): draw the starting state (e.g. the cwd badge) and supply inspector details
+- packs can generate entities from a directive with `c.addEntity` / `c.addLink` (the `fs` tree does this)
 - `vocab`: the compact cheat-sheet the MCP server sends to AI authors (keep it under ~400 tokens)
 
 Because visuals go through the `Effects` interface, every pack automatically works headless,

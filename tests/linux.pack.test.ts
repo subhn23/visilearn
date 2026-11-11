@@ -193,3 +193,56 @@ test('tree layout: deeper paths sit further right', () => {
   assert.ok(pos.get('/home/asha')!.x < pos.get('/home/asha/notes.txt')!.x);
   assert.equal(pos.get('/etc')!.x, pos.get('/home')!.x);
 });
+
+test('tree layout: parents centred on their children, siblings in order, no overlaps, no crossings', () => {
+  const s = build(`scene linux.tree "T"
+use linux
+fs as=asha
+  home/
+    asha/
+      notes.txt
+      projects/
+        app.py
+        README.md
+        tests/
+          t.py
+  etc/
+    hosts
+  tmp/
+step "s"
+  run pwd`);
+  const { pos } = layoutScene(s, packs);
+  const y = (id: string) => pos.get(id)!.y;
+  // siblings keep declaration order top → bottom
+  assert.ok(y('/home') < y('/etc') && y('/etc') < y('/tmp'));
+  assert.ok(y('/home/asha/projects/app.py') < y('/home/asha/projects/README.md'));
+  // a parent sits midway between its first and last child
+  const mid = (p: string, a: string, b: string) => assert.equal(y(p), (y(a) + y(b)) / 2, p);
+  mid('/home/asha/projects', '/home/asha/projects/app.py', '/home/asha/projects/tests');
+  mid('/', '/home', '/tmp');
+  // every node has its own spot
+  const spots = new Set([...pos.values()].map((p) => `${p.x},${p.y}`));
+  assert.equal(spots.size, pos.size);
+  // edges between adjacent columns never cross: child order follows parent order
+  const cols = new Map<number, string[]>();
+  for (const [id, p] of pos) cols.set(p.x, [...(cols.get(p.x) ?? []), id]);
+  for (const [a1, b1] of s.links) for (const [a2, b2] of s.links) {
+    if (pos.get(a1)!.x !== pos.get(a2)!.x || a1 === a2) continue;
+    if (y(a1) < y(a2)) assert.ok(y(b1) <= y(b2), `${a1}->${b1} crosses ${a2}->${b2}`);
+  }
+});
+
+test('non-tree graphs (several parents) keep the general layout', () => {
+  const { scene } = compile(`scene net.x "X"
+use net
+host a
+host b
+switch s
+server z
+link a s z
+link b s
+step "s"
+  a ping z`, packs);
+  const { pos } = layoutScene(scene!, packs);
+  assert.equal(pos.get('a')!.x, pos.get('b')!.x, 'both hosts share the left column');
+});

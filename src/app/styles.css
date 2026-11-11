@@ -31,6 +31,11 @@
   --sky: #a9c4d8;
   --rose: #e2adb5;
   --on-swatch: #3f3831;
+  --term-bg: #433d35;
+  --term-fg: #ece2cd;
+  --term-dim: #b3a78f;
+  --term-prompt: #e3c27a;
+  --term-err: #eba595;
   --ok: #6d9a78;
   --bad: #c27062;
   --warn: #c79a49;
@@ -53,6 +58,11 @@
   --sky: #7397b1;
   --rose: #b4818a;
   --on-swatch: #1f1c18;
+  --term-bg: #1c1a17;
+  --term-fg: #d9cdb7;
+  --term-dim: #8f8574;
+  --term-prompt: #c9a95f;
+  --term-err: #d89080;
   --ok: #7fb08b;
   --bad: #d4806f;
   --warn: #d2a75a;
@@ -155,6 +165,14 @@
   .meter { @apply brut-flat h-3 overflow-hidden bg-card; }
   .meter > span { @apply block h-full border-r-2 border-stroke stripes; }
 }
+
+/* ---------- terminal ---------- */
+.term-screen { background: var(--term-bg); color: var(--term-fg); cursor: text; }
+.term-prompt { color: var(--term-prompt); font-weight: 700; }
+.term-dim { color: var(--term-dim); }
+.term-err { color: var(--term-err); }
+.term-input { background: transparent; border: 0; outline: none; color: var(--term-fg); font: inherit; caret-color: var(--term-prompt); padding: 0; }
+.term-screen ::selection { background: var(--term-prompt); color: var(--term-bg); }
 
 /* ---------- SVG stage ---------- */
 .stage-svg { display: block; width: 100%; max-height: 62vh; margin: 0 auto; font-family: var(--font-mono); }

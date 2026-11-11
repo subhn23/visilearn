@@ -1,0 +1,42 @@
+scene linux.navigate "Finding your way around"
+about "The Linux filesystem is one big tree. pwd tells you where you are, ls looks around, cd moves."
+use linux
+
+fs as=asha
+  home/
+    asha/
+      notes.txt "buy milk"
+      projects/
+        app.py "print('hello')"
+        README.md "My first app"
+  etc/
+    hosts "127.0.0.1 localhost"
+  tmp/
+
+step "Everything starts at /"
+  say "Linux keeps every file in a single tree. The very top is called root and is written as /."
+  highlight /
+  note / "root: the top of the tree"
+
+step "Where am I?"
+  say "Your terminal is always inside one folder. pwd (print working directory) shows its full path."
+  run pwd
+  note /home/asha "your home folder"
+
+step "Look around"
+  ask "What will ls show right now?" "Every file on the computer" "What is inside /home/asha" "Only files, never folders" answer=2
+  run ls
+
+step "Move with cd"
+  run "cd projects"
+  run ls
+  say "Watch the badge move. projects is a relative path; /home/asha/projects is the absolute path to the same place."
+
+step "Go back up"
+  ask "Which command goes up one level, back to /home/asha?" "cd .." "cd /" "cd up" answer=1
+  run "cd .."
+
+step "Your turn"
+  say "Use the terminal below: go to /etc and print the hosts file."
+  hint "cd /etc   then   cat hosts"
+  goal cwd /etc, ran cat, output "localhost"

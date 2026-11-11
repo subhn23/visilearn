@@ -1,0 +1,38 @@
+scene linux.permissions "Permissions: who can do what?"
+about "Every file says who may read, write and run it. chmod changes those rules."
+use linux
+
+fs as=asha show=perms
+  home/
+    asha/
+      deploy.sh mode=644
+        | echo Deploying website...
+        | echo Done!
+      diary.txt "dear diary" mode=600
+  etc/
+    hosts "127.0.0.1 localhost"
+  tmp/
+
+step "Reading the permission string"
+  say "-rw-r--r-- reads as: a file (-), then rw- for the owner, r-- for the group, r-- for everyone else."
+  run "ls -l"
+  note /home/asha/deploy.sh "owner: rw-  others: r--"
+
+step "Running a script"
+  ask "deploy.sh is -rw-r--r--. What happens when asha runs ./deploy.sh?" "It runs" "Permission denied" "File not found" answer=2
+  run ./deploy.sh
+
+step "Add the execute bit"
+  run "chmod +x deploy.sh"
+  run ./deploy.sh
+  say "x means execute. +x added it for the owner, the group and everyone else."
+
+step "Not your file"
+  ask "/etc/hosts belongs to root and is -rw-r--r--. Can asha change it?" "Yes" "No, only root may write it" answer=2
+  run "echo hacked > /etc/hosts"
+  say "Only the owner (or root, using sudo) may change a file's contents or permissions."
+
+step "Your turn"
+  say "Make diary.txt readable by everyone but writable only by you. Then make deploy.sh private: only you may read, write and run it."
+  hint "chmod 644 diary.txt   and   chmod 700 deploy.sh"
+  goal mode /home/asha/diary.txt 644, mode /home/asha/deploy.sh 700

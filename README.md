@@ -3,7 +3,7 @@
 **Learn computer science by seeing and doing.**
 
 visilearn is a visual, interactive learning platform for students and working professionals.
-Concepts such as firewalls, routing, Linux, Docker and Kubernetes are taught through short
+Concepts such as firewalls, routing, the Linux command line, Docker and Kubernetes are taught through short
 animated scenes you can poke at. You watch a concept move, **predict** what happens next, then
 take the controls and solve a challenge.
 
@@ -16,9 +16,9 @@ cheaply and for a human expert to review as a plain text diff.
   <img src="docs/images/player-light.png" alt="Firewall lesson in the light theme: network diagram, predict question and live firewall rule editor" width="860">
 </p>
 
-| Catalog | Dark theme | Phone |
-|---|---|---|
-| <img src="docs/images/catalog-light.png" alt="Topic catalog" width="300"> | <img src="docs/images/player-dark.png" alt="Router failure lesson in the dark theme" width="300"> | <img src="docs/images/mobile.png" alt="Lesson on a phone" width="140"> |
+| Catalog | Linux terminal (dark) | Networking (dark) | Phone |
+|---|---|---|---|
+| <img src="docs/images/catalog-light.png" alt="Topic catalog" width="240"> | <img src="docs/images/linux-dark.png" alt="Linux permissions lesson: filesystem tree and terminal" width="240"> | <img src="docs/images/player-dark.png" alt="Router failure lesson in the dark theme" width="240"> | <img src="docs/images/mobile.png" alt="Lesson on a phone" width="110"> |
 
 ---
 
@@ -56,6 +56,7 @@ cheaply and for a human expert to review as a plain text diff.
 - **Animated scenes.** Packets travel, firewalls drop traffic, routers fail, and the colour of the outcome is revealed on arrival.
 - **Predict → observe → explain.** Questions pause the animation until you commit to an answer.
 - **Hands-on challenges.** Edit the firewall rules live, send any packet from the *packet lab*, and complete a checklist that the simulator grades.
+- **A real-feeling Linux terminal.** Type commands and watch the filesystem tree react: the *you are here* badge moves on `cd`, files appear and disappear, and permissions update live. It has history (↑ ↓) and Tab completion, and a simulated filesystem with users, permissions, `sudo`, pipes and redirects.
 - **Click any device** to learn what it does.
 - **Progress saved on your device.** You resume at the first unfinished step, and your rule edits are remembered. Export/Import a JSON file to back up or switch browsers.
 - **Light, dark and Auto themes**, a phone-friendly layout, keyboard navigation (← →), a reduced-motion setting and screen-reader labels.
@@ -108,6 +109,13 @@ npm run dev          # http://localhost:5173  (live reload)
 | `npm run mcp` | Start the authoring MCP server (stdio) |
 | `npm run deploy` | check → test → build → `firebase deploy --only hosting` |
 
+## Topics available now
+
+| Track | Lessons |
+|---|---|
+| **Networking** (`net`) | Firewalls: who gets in? · How a packet finds its way · Ports: doors on a server |
+| **Linux** (`linux`) | Finding your way around · Permissions: who can do what? · Pipes: small tools, big results |
+
 ## How a lesson is written
 
 Lessons live in `scenes/<pack>/<name>.scene`. Here is the full firewall lesson:
@@ -152,6 +160,27 @@ What makes the language cheap to write and easy to review:
 4. **Outcomes are computed.** Whether a packet is delivered, dropped, refused or unreachable comes from the simulator, and so do goals.
 5. **Strict grammar with helpful errors.** An AI can fix a mistake in one round trip.
 
+A Linux lesson declares its whole filesystem as one indented tree:
+
+```
+scene linux.navigate "Finding your way around"
+use linux
+
+fs as=asha
+  home/
+    asha/
+      notes.txt "buy milk"
+      projects/
+  etc/
+    hosts "127.0.0.1 localhost"
+
+step "Where am I?"
+  run pwd
+step "Your turn"
+  say "Go to /etc and print the hosts file."
+  goal cwd /etc, ran cat, output "localhost"
+```
+
 The full reference is in **[docs/LANGUAGE.md](docs/LANGUAGE.md)**.
 
 ## Architecture
@@ -184,6 +213,12 @@ src/
       icons.ts         48×48 SVG icons
       model/           tested DOM-free UI models (rules editor, packet lab)
       ui.ts + panel.html  Alpine components + template for the side panel
+    linux/           Linux pack
+      vfs.ts           in-memory filesystem: owners, permission bits, chmod parsing
+      shell.ts         bash-like shell → output + events (cd, create, remove, mode, denied …)
+      index.ts         `fs` tree directive, `run` verb, goals, terminal, events → stage effects
+      model/           terminal input model (history, Tab completion)
+      ui.ts + panel.html  Alpine terminal (main slot, under the stage)
   render/stage.ts  SVG renderer; implements Effects with animation (cancellable per step)
   app/
     model/           tested view models: theme, catalog, step flow, progress store
@@ -201,6 +236,8 @@ tools/check.ts     validate + simulate every scene
 
 - **Effects interface.** Packs never touch the DOM. They call `rt.fx.travel()`, `flash()`, `note()`, `setDown()` and `log()`. The SVG `Stage` animates these calls; the headless implementation records them. That's why every lesson can be simulated in tests and through MCP.
 - **Engine objects stay outside Alpine's reactive state.** The Stage, Runtime and Scene live in a component closure, so proxies don't slow the animation loop or break object identity.
+- **Graphs can change at runtime.** Packs call `addNode` / `removeNode`, and the stage re-lays out with animation. Strict trees (like a filesystem) get a tidy, crossing-free tree layout.
+- **Panel slots.** A pack panel lives either beside the lesson card (`side`, e.g. the firewall editor) or under the stage (`main`, e.g. the terminal).
 - **Deterministic step navigation.** Opening step *n* fast-forwards the state through steps 1…n-1 without animation (for example, a router killed in step 3 stays down in step 4), while the learner's own edits are kept.
 
 ## AI-assisted authoring with MCP
@@ -262,8 +299,13 @@ To keep logic testable without a browser, UI behaviour lives in **DOM-free view 
 | `stepFlow.test.ts` | resume step, completion rules, status text |
 | `rulesEditor.test.ts` | live rule editing, errors, ordering, policy, reset, read-only |
 | `packetLab.test.ts` | endpoint filtering, input validation |
+| `linux.shell.test.ts` | paths, every command, pipes, redirects, permissions, sudo, scripts, Tab completion |
+| `linux.pack.test.ts` | `fs` language and errors, terminal, goals, events → effects, reset, tree layout |
+| `linux.termInput.test.ts` | terminal history and Tab behaviour |
+| `linux.scenes.test.ts` | every Linux challenge is solvable with its hint |
 | `progress.test.ts` | persistence, corrupt/blocked storage, import merge, export round-trip |
 | `e2e/player.e2e.ts` | catalog, theme toggle, predict flow, challenge completion, inline errors, phone layout |
+| `e2e/linux.e2e.ts` | tree + cwd badge, typing commands, files appearing/disappearing, history/Tab, live permissions |
 
 ## Deploying to Firebase Hosting
 
@@ -294,7 +336,8 @@ There are no server functions and no database.
 
 ## Roadmap
 
-- **Packs:** `linux` (terminal + virtual filesystem), `docker` (layers, containers, ports), `k8s` (reconciler loop, self-healing), `code` (stack/heap traces), `robo` (sense → think → act)
+- **Packs:** `docker` (layers, containers, ports), `k8s` (reconciler loop, self-healing), `code` (stack/heap traces), `robo` (sense → think → act)
+- **More Linux:** processes (`ps`, `kill`), users and groups, environment variables, `find`
 - **MCP `preview` tool** that returns a PNG snapshot of any step
 - **`solution` blocks** so `simulate` proves every challenge is solvable
 - **Offline support** (service worker) and **translations** (Hindi, Odia, …)

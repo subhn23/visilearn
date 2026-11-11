@@ -1,0 +1,39 @@
+scene linux.pipes "Pipes: small tools, big results"
+about "Linux tools each do one job. The pipe | joins them so the output of one becomes the input of the next."
+use linux
+
+fs as=asha cwd=/var/log
+  home/
+    asha/
+  var/
+    log/
+      app.log
+        | 09:00 ok server started
+        | 09:05 error disk full
+        | 09:06 ok retry
+        | 09:10 error timeout
+        | 09:12 ok request served
+        | 09:15 error disk full
+  tmp/
+
+step "A noisy log file"
+  say "Servers write logs. Reading them line by line gets slow fast."
+  run "cat app.log"
+
+step "Find the errors"
+  run "grep error app.log"
+  say "grep prints only the lines that contain the pattern."
+
+step "Count them with a pipe"
+  ask "What does grep error app.log | wc -l print?" "The error lines" "The number of error lines" "An error" answer=2
+  run "grep error app.log | wc -l"
+
+step "Save the result"
+  say "> sends output into a file instead of the screen. /var/log belongs to root, so save into your home folder."
+  run "grep error app.log > /home/asha/errors.txt"
+  run "cat /home/asha/errors.txt"
+
+step "Your turn"
+  say "Save only the 'disk full' lines into /tmp/disk.txt, then count how many lines say ok."
+  hint "grep 'disk full' app.log > /tmp/disk.txt   and   grep ok app.log | wc -l"
+  goal contains /tmp/disk.txt "disk full", output "3"

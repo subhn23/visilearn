@@ -1,0 +1,20 @@
+<section x-data="linuxTerm()" class="brut overflow-hidden bg-card">
+  <header class="win-bar bg-lilac text-on-swatch">
+    <span class="win-dots"><i class="bg-rose"></i><i class="bg-mustard"></i><i class="bg-mint"></i></span>
+    <span class="flex-1 truncate" x-text="'terminal: ' + user + '@visilearn'"></span>
+    <span class="chip border-on-swatch/60 bg-card/60 hidden sm:inline-flex">↑↓ history · tab completes</span>
+  </header>
+  <div class="term-screen max-h-80 min-h-44 overflow-y-auto px-4 py-3 font-mono text-[13px] leading-relaxed"
+    x-ref="screen" @click="$refs.input.focus({ preventScroll: true })">
+    <p class="term-dim" x-show="!lines.length">Type <b>help</b> to see what you can do.</p>
+    <template x-for="l in lines" :key="l.id">
+      <div class="break-words" :class="l.kind === 'err' ? 'term-err' : ''"><span class="term-prompt" x-show="l.kind === 'cmd'" x-text="l.prompt + ' '"></span><span class="whitespace-pre-wrap" x-text="l.text"></span></div>
+    </template>
+    <div class="term-dim" x-show="options.length" x-text="options.join('   ')"></div>
+    <label class="flex items-baseline gap-2">
+      <span class="term-prompt shrink-0" x-text="prompt"></span>
+      <input x-ref="input" class="term-input min-w-0 flex-1" spellcheck="false" autocomplete="off" autocapitalize="off"
+        aria-label="Terminal command" :value="value" @input="setValue($event.target.value)" @keydown="key($event)" :disabled="busy">
+    </label>
+  </div>
+</section>

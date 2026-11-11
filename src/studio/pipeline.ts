@@ -1,6 +1,7 @@
 // The Studio agent: pack → outline → lessons → module. DOM-free; the model is injected as `chat`.
 // Every model answer is structured JSON; our converters produce the text; our compiler and simulator
 // check it; errors go back to the model (repair loop).
+import { extractJson } from '../ai/json.ts';
 import { AiError } from '../ai/types.ts';
 import type { ChatMessage, ChatRequest, ChatResult } from '../ai/types.ts';
 import { compile } from '../core/compile.ts';
@@ -13,6 +14,7 @@ import { compilePack } from '../packs/concept/packdef.ts';
 import { withPacks } from '../packs/index.ts';
 import type { Section } from './extract/sections.ts';
 import { lessonSystem, OUTLINE_SYSTEM, PACK_SYSTEM, REPAIR } from './prompts.ts';
+import { normalizeLesson, normalizeOutline, normalizePack } from './normalize.ts';
 import { LESSON_SCHEMA, lessonToScene, numbered, OUTLINE_SCHEMA, PACK_SCHEMA, packToText } from './specs.ts';
 import type { LessonSpec, OutlineItem, PackSpec } from './specs.ts';
 
@@ -31,37 +33,55 @@ export interface StudioDeps {
   /** extra rounds after the first attempt (default 3) */
   maxRepairs?: number;
   temperature?: number;
+  /**
+   * Ask for schema-constrained output. Off by default: small local models (gemma4:12b) can loop
+   * forever under grammar-constrained decoding. We show the JSON shape in the prompt instead and
+   * parse + normalize defensively.
+   */
+  structured?: boolean;
 }
 
 const CTX = 8192;
+/** output caps per stage (tokens, including any reasoning): a runaway generation stops here */
+export const MAX_TOKENS = { pack: 3000, outline: 2000, lesson: 4000 };
 
-async function askJson(deps: StudioDeps, messages: ChatMessage[], schema: object): Promise<unknown> {
+async function askJson(deps: StudioDeps, messages: ChatMessage[], schema: object, maxTokens: number): Promise<unknown> {
   if (deps.signal?.aborted) throw new AiError('aborted', 'Cancelled.');
   let thinking = 0;
   let writing = 0;
   const r = await deps.chat({
     messages,
-    schema,
+    ...(deps.structured ? { schema } : {}),
     temperature: deps.temperature ?? 0.3,
     numCtx: CTX,
+    maxTokens,
     signal: deps.signal,
     onThinking: (t) => { thinking += t.length; deps.onEvent?.({ type: 'thinking', chars: thinking }); },
     onToken: (t) => { writing += t.length; deps.onEvent?.({ type: 'writing', chars: writing }); },
   });
-  if (r.json === undefined) throw new AiError('bad_response', 'The model did not return JSON.');
-  return r.json;
+  const json = r.json ?? extractJson(r.text);
+  if (json === undefined) throw new AiError('bad_response', 'The model did not return JSON (the answer may have been cut off).', 'Try again or use a larger model.');
+  return json;
 }
 
 interface Built<T> { value: T | null; text: string; errors: string[] }
 
-async function withRepair<T>(deps: StudioDeps, first: ChatMessage[], schema: object, what: string, build: (json: any) => Built<T> | Promise<Built<T>>) {
+async function withRepair<T>(deps: StudioDeps, first: ChatMessage[], schema: object, maxTokens: number, what: string, build: (json: any) => Built<T> | Promise<Built<T>>) {
   const max = deps.maxRepairs ?? 3;
   let messages = first;
   let last: Built<T> = { value: null, text: '', errors: ['no answer'] };
   let json: unknown;
   for (let attempt = 1; attempt <= max + 1; attempt++) {
     deps.onEvent?.({ type: 'attempt', message: attempt === 1 ? `Writing ${what}…` : `Fixing ${what} (round ${attempt - 1})…` });
-    json = await askJson(deps, messages, schema);
+    try {
+      json = await askJson(deps, messages, schema, maxTokens);
+    } catch (e) {
+      if (!(e instanceof AiError) || e.code !== 'bad_response') throw e;
+      last = { value: null, text: '', errors: [e.message] };
+      deps.onEvent?.({ type: 'problem', message: `${what}: unreadable answer`, errors: last.errors });
+      messages = [...first, { role: 'user', content: 'Your last answer was not complete JSON. Answer again with ONLY the JSON object, shorter.' }];
+      continue;
+    }
     last = await build(json);
     if (last.value) return { ...last, json, attempts: attempt };
     deps.onEvent?.({ type: 'problem', message: `${what}: ${last.errors.length} problem${last.errors.length === 1 ? '' : 's'}`, errors: last.errors });
@@ -99,27 +119,26 @@ export async function generatePack(deps: StudioDeps, input: { topic: string; sec
     { role: 'system', content: PACK_SYSTEM },
     { role: 'user', content: `Topic: ${input.topic}\n\nSource sections:\n${digest(input.sections)}\n\nDesign the pack as JSON.` },
   ];
-  const r = await withRepair<PackDef>(deps, first, PACK_SCHEMA, 'the pack', (json: PackSpec) => {
-    const text = packToText(json);
+  const r = await withRepair<PackDef>(deps, first, PACK_SCHEMA, MAX_TOKENS.pack, 'the pack', (json: unknown) => {
+    const text = packToText(normalizePack(json));
     const c = compilePack(text, deps.registry);
     return { value: c.pack, text, errors: c.diags.filter((d) => d.severity === 'error').map((d) => `L${d.line} ${d.msg}`) };
   });
-  return { pack: r.value, source: r.text, spec: r.json as PackSpec, attempts: r.attempts, errors: r.value ? [] : r.errors };
+  return { pack: r.value, source: r.text, spec: normalizePack(r.json ?? {}) as PackSpec, attempts: r.attempts, errors: r.value ? [] : r.errors };
 }
 
 // ---- 2. outline ----------------------------------------------------------------------
 
 export async function generateOutline(deps: StudioDeps, input: { topic: string; sections: Section[]; packVocab: string; maxLessons: number }): Promise<OutlineItem[]> {
   deps.onEvent?.({ type: 'status', message: 'Planning the lessons…' });
-  const json = (await askJson(deps, [
+  const json = await askJson(deps, [
     { role: 'system', content: OUTLINE_SYSTEM },
     {
       role: 'user',
       content: `Topic: ${input.topic}\nThe lessons can draw these things:\n${input.packVocab}\n\nSource sections:\n${digest(input.sections)}\n\nPlan at most ${input.maxLessons} lessons as JSON.`,
     },
-  ], OUTLINE_SCHEMA)) as { lessons?: OutlineItem[] };
-  const items = (json.lessons ?? [])
-    .filter((l) => l && String(l.title ?? '').trim())
+  ], OUTLINE_SCHEMA, MAX_TOKENS.outline);
+  const items = normalizeOutline(json)
     .slice(0, input.maxLessons)
     .map((l) => ({
       title: String(l.title).trim(),
@@ -183,15 +202,15 @@ export async function generateLesson(deps: StudioDeps, input: { item: OutlineIte
       ].join('\n'),
     },
   ];
-  const r = await withRepair<Scene>(deps, first, LESSON_SCHEMA, 'the lesson', async (json: LessonSpec) => {
-    const text = lessonToScene(json, names);
+  const r = await withRepair<Scene>(deps, first, LESSON_SCHEMA, MAX_TOKENS.lesson, 'the lesson', async (json: unknown) => {
+    const text = lessonToScene(normalizeLesson(json), names);
     const c = compile(text, registry);
     const errors = c.diags.filter((d) => d.severity === 'error').map((d) => `L${d.line} ${d.msg}`);
     if (!c.scene) return { value: null, text, errors };
     const problems = await verifyLesson(c.scene, registry);
     return { value: problems.length ? null : c.scene, text, errors: problems };
   });
-  return { scene: r.value, source: r.text, spec: r.json as LessonSpec, attempts: r.attempts, errors: r.value ? [] : r.errors };
+  return { scene: r.value, source: r.text, spec: normalizeLesson(r.json ?? {}) as LessonSpec, attempts: r.attempts, errors: r.value ? [] : r.errors };
 }
 
 // ---- 4. module -----------------------------------------------------------------------

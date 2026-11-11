@@ -90,3 +90,18 @@ test('a heading that wraps onto two lines becomes one title', () => {
   const titles = splitSections(lines).map((x) => x.title);
   assert.deepEqual(titles, ['Chapter 1: Topic a', 'Chapter 2: Dates, Timestamps, and Intervals', 'Chapter 3: Topic c']);
 });
+
+test('groupChapters: each top-level heading with the sections under it', async () => {
+  const { groupChapters } = await import('../src/studio/extract/sections.ts');
+  const s = [
+    { title: '(front matter)', level: 1, page: 1, endPage: 1, text: 'x' },
+    { title: 'Chapter 1: A', level: 1, page: 2, endPage: 2, text: '' },
+    { title: 'Section 1.1', level: 2, page: 2, endPage: 3, text: 'a' },
+    { title: 'Section 1.2', level: 2, page: 3, endPage: 4, text: 'b' },
+    { title: 'Chapter 2: B', level: 1, page: 5, endPage: 6, text: 'c' },
+  ];
+  const ch = groupChapters(s);
+  assert.deepEqual(ch.map((c) => [c.title, c.sections.length, c.page, c.endPage]), [
+    ['(front matter)', 1, 1, 1], ['Chapter 1: A', 3, 2, 4], ['Chapter 2: B', 1, 5, 6],
+  ]);
+});

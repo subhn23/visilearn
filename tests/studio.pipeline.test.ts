@@ -36,28 +36,45 @@ test('generatePack: compiles the model JSON; prompt carries the topic, sections 
   assert.match(prompt, /SQL/);
   assert.match(prompt, /Chapter 2: Queries/);
   assert.match(prompt, /add KIND ID/, 'building blocks are described');
-  assert.ok(reqs[0].schema, 'structured output requested');
+  assert.equal(reqs[0].schema, undefined, 'no schema by default: small models loop under constrained decoding');
+  assert.match(prompt, /"kinds":\s*\[\{"name"/, 'the exact JSON shape is shown as an example');
+  assert.ok(reqs[0].maxTokens && reqs[0].maxTokens <= 4000, 'output is capped so a runaway generation cannot hang');
   assert.ok(events.some((e) => e.type === 'thinking'));
 });
 
+test('structured: true opts into schema-constrained output (for models that handle it well)', async () => {
+  const { chat, reqs } = scripted([PACK_SPEC]);
+  await generatePack({ chat, registry: builtinPacks, structured: true }, { topic: 'SQL', sections });
+  assert.ok(reqs[0].schema);
+});
+
+test('replies are parsed from text and normalized (fences, aliases, invented icons)', async () => {
+  const messy = '```json\n' + JSON.stringify({ name: 'sql', description: 'Tables.', kinds: [{ name: 'table', icon: 'grid-table', props: { rows: 'n' } }], macros: [] }) + '\n```';
+  const chat = async (): Promise<ChatResult> => ({ text: messy, ms: 1 });
+  const r = await generatePack({ chat, registry: builtinPacks }, { topic: 'SQL', sections });
+  assert.ok(r.pack, r.errors.join('\n'));
+  assert.match(r.source, /kind table icon=table/);
+});
+
 test('generatePack: compiler errors go back to the model until it is fixed', async () => {
-  const broken = { ...PACK_SPEC, kinds: [{ ...PACK_SPEC.kinds[0], icon: 'databse' }, ...PACK_SPEC.kinds.slice(1)] };
+  // (typos like icon 'databse' are now fixed by the normalizer; use an error only the model can fix)
+  const broken = { ...PACK_SPEC, macros: [{ name: 'insert', params: ['ROW', 'TABLE'], body: ['teleport ROW TABLE'] }] };
   const { chat, reqs } = scripted([broken, PACK_SPEC]);
   const r = await generatePack({ chat, registry: builtinPacks }, { topic: 'SQL', sections });
   assert.ok(r.pack);
   assert.equal(r.attempts, 2);
   const repair = reqs[1].messages.map((m) => m.content).join('\n');
-  assert.match(repair, /unknown icon 'databse' \(did you mean 'database'\?\)/);
+  assert.match(repair, /unknown action 'teleport'/);
   assert.match(repair, /^2  about /m, 'numbered pack text is shown');
 });
 
 test('generatePack: gives up after maxRepairs and returns the last errors', async () => {
-  const bad = { ...PACK_SPEC, name: 'net' };
+  const bad = { ...PACK_SPEC, macros: [{ name: 'insert', params: ['ROW'], body: ['teleport ROW'] }] };
   const { chat } = scripted([bad, bad, bad]);
   const r = await generatePack({ chat, registry: builtinPacks, maxRepairs: 2 }, { topic: 'x', sections });
   assert.equal(r.pack, null);
   assert.equal(r.attempts, 3);
-  assert.match(r.errors.join('\n'), /built-in pack/);
+  assert.match(r.errors.join('\n'), /unknown action 'teleport'/);
 });
 
 test('generateOutline: returns editable lesson items with section references', async () => {

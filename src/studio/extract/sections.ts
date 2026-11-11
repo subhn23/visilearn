@@ -119,3 +119,25 @@ export function splitSections(input: TextLine[], opts: { pagesPerChunk?: number;
   flush();
   return out;
 }
+
+export interface Chapter {
+  title: string;
+  page: number;
+  endPage: number;
+  /** the chapter heading section followed by its sub-sections */
+  sections: Section[];
+}
+
+/** Group a flat section list into chapters (each level-1 section and everything under it). */
+export function groupChapters(sections: Section[]): Chapter[] {
+  const out: Chapter[] = [];
+  for (const s of sections) {
+    if (s.level === 1 || !out.length) out.push({ title: s.title, page: s.page, endPage: s.endPage, sections: [s] });
+    else {
+      const c = out[out.length - 1];
+      c.sections.push(s);
+      c.endPage = Math.max(c.endPage, s.endPage);
+    }
+  }
+  return out;
+}

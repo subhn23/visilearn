@@ -1,109 +1,92 @@
-// Interactive side-panel for the net pack: live firewall rule editor + packet lab.
-import { h } from '../../app/dom.ts';
-import type { PanelFactory } from '../../app/panels.ts';
-import { parseRule, sendPacket } from './sim.ts';
-import type { NetState, Rule } from './sim.ts';
+// Alpine components for the net pack's side panel. Logic lives in tested DOM-free models.
+import type { Alpine } from 'alpinejs';
+import type { Runtime } from '../../core/types.ts';
+import { buildPacket, labEndpoints } from './model/packetLab.ts';
+import { RulesEditor } from './model/rulesEditor.ts';
+import { sendPacket } from './sim.ts';
+import type { NetState } from './sim.ts';
+import html from './panel.html?raw';
 
-export const netPanel: PanelFactory = ({ scene, rt, onChange }) => {
-  const st = rt.state.net as NetState;
-  const ids = new Set(scene.entities.map((e) => e.id));
-  const wrap = h('div.panels');
+/** Methods the player component exposes to nested pack panels. */
+interface PlayerScope {
+  rt(): Runtime;
+  changed(): void;
+}
 
-  for (const [fwId, fw] of Object.entries(st.rules)) {
-    const label = scene.entities.find((e) => e.id === fwId)?.label ?? fwId;
-    const card = h('section.card.rules-card');
-    const list = h('ol.rules');
+export const netPanelHtml = html;
 
-    const commit = () => {
-      const rows = [...list.querySelectorAll<HTMLInputElement>('input.rule-input')];
-      const rules: Rule[] = [];
-      for (const inp of rows) {
-        const res = inp.value.trim() ? parseRule(inp.value, (id) => ids.has(id)) : {};
-        const err = inp.parentElement!.querySelector('.rule-err')!;
-        inp.classList.toggle('invalid', !!res.error);
-        inp.setAttribute('aria-invalid', String(!!res.error));
-        err.textContent = res.error ?? '';
-        if (res.rule) rules.push(res.rule);
-      }
-      fw.rules = rules;
-      onChange();
-    };
+export function registerNetUI(alpine: Alpine) {
+  alpine.data('netPanel', () => ({
+    firewalls: [] as string[],
+    init(this: PlayerScope & { firewalls: string[] }) {
+      this.firewalls = Object.keys((this.rt().state.net as NetState).rules);
+    },
+  }));
 
-    const row = (text: string) => {
-      const inp = h('input.rule-input', {
-        value: text, spellcheck: false, autocomplete: 'off', readOnly: !fw.editable,
-        'aria-label': 'Firewall rule', placeholder: 'allow tcp:22 from laptop to web',
-      });
-      inp.addEventListener('input', commit);
-      const li = h('li.rule', null,
-        h('div.rule-line', null,
-          inp,
-          fw.editable && h('button.icon-btn', { title: 'Move up', 'aria-label': 'Move rule up', onclick: () => { li.previousElementSibling?.before(li); commit(); } }, '↑'),
-          fw.editable && h('button.icon-btn', { title: 'Delete rule', 'aria-label': 'Delete rule', onclick: () => { li.remove(); commit(); } }, '✕'),
-        ),
-        h('div.rule-err', { 'aria-live': 'polite' }),
-      );
-      return li;
-    };
-
-    const render = () => {
-      list.replaceChildren(...fw.rules.map((r) => row(r.text)));
-      policy.value = fw.policy;
-    };
-
-    const policy = h('select.policy', { disabled: !fw.editable, 'aria-label': 'Default policy' },
-      h('option', { value: 'deny' }, 'deny'),
-      h('option', { value: 'allow' }, 'allow'));
-    policy.addEventListener('change', () => { fw.policy = policy.value as 'allow' | 'deny'; onChange(); });
-
-    card.append(h('div', null,
-      h('header.card-head', null, h('h3', null, `Firewall rules · ${label}`), fw.editable ? h('span.badge', null, 'editable') : h('span.badge.muted', null, 'read-only')),
-      h('p.card-sub', null, 'Checked top to bottom. First match wins.'),
-      list,
-      h('div.policy-row', null, h('span', null, 'No match → default policy'), policy),
-      fw.editable && h('div.row-actions', null,
-        h('button.btn.small', { onclick: () => { const li = row(''); list.append(li); li.querySelector('input')!.focus(); } }, '+ Add rule'),
-        h('button.btn.small.ghost', {
-          onclick: () => {
-            fw.rules = fw.initial.map((t) => parseRule(t, (id) => ids.has(id)).rule!).filter(Boolean);
-            fw.policy = fw.initialPolicy;
-            render();
-            onChange();
-          },
-        }, 'Reset'),
-      ),
-    ));
-    render();
-    wrap.append(card);
-  }
-
-  // ---- packet lab: learner sends any packet they like ----
-  const ends = scene.entities.filter((e) => !['fw', 'switch', 'router'].includes(e.kind));
-  if (ends.length >= 2) {
-    const opts = (sel: number) => ends.map((e, i) => h('option', { value: e.id, selected: i === sel }, e.label));
-    const from = h('select', { 'aria-label': 'From' }, opts(0));
-    const to = h('select', { 'aria-label': 'To' }, opts(ends.length - 1));
-    const proto = h('select', { 'aria-label': 'Protocol' }, h('option', { value: 'tcp' }, 'TCP'), h('option', { value: 'udp' }, 'UDP'), h('option', { value: 'icmp' }, 'ping'));
-    const port = h('input', { type: 'number', min: 1, max: 65535, value: 22, 'aria-label': 'Port', list: 'well-known-ports' });
-    const dl = h('datalist', { id: 'well-known-ports' }, ...[22, 53, 80, 443, 3306].map((p) => h('option', { value: p })));
-    proto.addEventListener('change', () => { port.disabled = proto.value === 'icmp'; });
-    const go = h('button.btn.primary', {
-      onclick: async () => {
-        const p = parseInt(port.value, 10);
-        if (proto.value !== 'icmp' && !(p >= 1 && p <= 65535)) { port.focus(); return; }
-        if (from.value === to.value) return;
-        await sendPacket(rt, { src: from.value, dst: to.value, proto: proto.value as 'tcp' | 'udp' | 'icmp', port: proto.value === 'icmp' ? null : p });
-        onChange();
+  alpine.data('netRules', (fwId: string) => {
+    let ed: RulesEditor;
+    return {
+      fwLabel: fwId,
+      rows: [] as { id: number; text: string; error: string }[],
+      policy: 'deny',
+      editable: false,
+      init(this: any) {
+        const rt = (this as PlayerScope).rt();
+        const ids = new Set(rt.scene.entities.map((e) => e.id));
+        ed = new RulesEditor((rt.state.net as NetState).rules[fwId], (id) => ids.has(id), () => this.changed());
+        this.fwLabel = rt.scene.entities.find((e) => e.id === fwId)?.label ?? fwId;
+        this.sync();
       },
-    }, 'Send packet');
-    wrap.append(h('section.card.lab', null,
-      h('header.card-head', null, h('h3', null, 'Packet lab')),
-      h('p.card-sub', null, 'Try any packet and watch what happens.'),
-      h('div.lab-grid', null,
-        h('label', null, 'From', from), h('label', null, 'To', to),
-        h('label', null, 'Protocol', proto), h('label', null, 'Port', port, dl)),
-      go,
-    ));
-  }
-  return wrap;
-};
+      sync(this: any) {
+        this.rows = ed.rows.map((r) => ({ ...r }));
+        this.policy = ed.policy;
+        this.editable = ed.editable;
+      },
+      add(this: any) {
+        ed.add('');
+        this.sync();
+        this.$nextTick(() => {
+          const inputs = (this.$root as HTMLElement).querySelectorAll<HTMLInputElement>('input.field');
+          inputs[inputs.length - 1]?.focus();
+        });
+      },
+      update(this: any, id: number, text: string) {
+        ed.update(id, text);
+        // refresh errors without re-rendering inputs (keeps the caret where it is)
+        ed.rows.forEach((r, i) => { if (this.rows[i]) this.rows[i].error = r.error; });
+      },
+      remove(this: any, id: number) { ed.remove(id); this.sync(); },
+      moveUp(this: any, id: number) { ed.moveUp(id); this.sync(); },
+      setPolicy(this: any, p: 'allow' | 'deny') { ed.setPolicy(p); this.sync(); },
+      reset(this: any) { ed.reset(); this.sync(); },
+    };
+  });
+
+  alpine.data('packetLab', () => ({
+    ends: [] as { id: string; label: string }[],
+    from: '',
+    to: '',
+    proto: 'tcp' as 'tcp' | 'udp' | 'icmp',
+    port: '22',
+    error: '',
+    busy: false,
+    init(this: any) {
+      const rt = (this as PlayerScope).rt();
+      this.ends = labEndpoints(rt.scene).map((e) => ({ id: e.id, label: e.label }));
+      this.from = this.ends[0]?.id ?? '';
+      this.to = this.ends[this.ends.length - 1]?.id ?? '';
+    },
+    async send(this: any) {
+      const res = buildPacket({ from: this.from, to: this.to, proto: this.proto, port: String(this.port) });
+      this.error = res.error ?? '';
+      if (!res.packet) return;
+      this.busy = true;
+      try {
+        await sendPacket((this as PlayerScope).rt(), res.packet);
+      } finally {
+        this.busy = false;
+        (this as PlayerScope).changed();
+      }
+    },
+  }));
+}

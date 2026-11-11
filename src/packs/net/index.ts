@@ -38,13 +38,13 @@ export const net: PackDef = {
   name: 'net',
   about: 'Computer networking: hosts, servers, firewalls, routers, packets.',
   entities: {
-    internet: { tier: 0, sub: 'ip', about: 'The public Internet: anyone, anywhere.' },
-    user: { tier: 0, about: 'A person using a device.' },
-    host: { tier: 0, sub: 'ip', about: 'A client computer. It starts connections; it usually does not listen on ports.', props: { port: 'listening ports, e.g. 22,80' } },
-    router: { tier: 1, sub: 'ip', about: 'A router forwards packets between different networks.' },
-    fw: { tier: 2, sub: 'ip', about: 'A firewall checks every packet against its rules, top to bottom. The first matching rule wins; if none match, the default policy applies.' },
-    switch: { tier: 3, about: 'A switch connects devices inside one local network (LAN).' },
-    server: { tier: 4, sub: 'ip', about: 'A server listens on ports and answers requests.', props: { port: 'listening ports, e.g. 80,443' } },
+    internet: { tier: 0, swatch: 'lilac', sub: 'ip', about: 'The public Internet: anyone, anywhere.' },
+    user: { tier: 0, swatch: 'rose', about: 'A person using a device.' },
+    host: { tier: 0, swatch: 'sky', sub: 'ip', about: 'A client computer. It starts connections; it usually does not listen on ports.', props: { port: 'listening ports, e.g. 22,80' } },
+    router: { tier: 1, swatch: 'mustard', sub: 'ip', about: 'A router forwards packets between different networks.' },
+    fw: { tier: 2, swatch: 'peach', sub: 'ip', about: 'A firewall checks every packet against its rules, top to bottom. The first matching rule wins; if none match, the default policy applies.' },
+    switch: { tier: 3, swatch: 'rose', about: 'A switch connects devices inside one local network (LAN).' },
+    server: { tier: 4, swatch: 'mint', sub: 'ip', about: 'A server listens on ports and answers requests.', props: { port: 'listening ports, e.g. 80,443' } },
   },
   directives: {
     rules: {

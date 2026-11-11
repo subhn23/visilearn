@@ -1,32 +1,26 @@
 import { compile } from '../core/compile.ts';
 import type { Diag, Scene } from '../core/types.ts';
 import { packs } from '../packs/index.ts';
+import type { CatalogEntry } from './model/catalog.ts';
 
-// Scenes are plain text files bundled at build time — static hosting, no backend.
+// Scenes are plain text files bundled at build time: static hosting, no backend.
 const files = import.meta.glob('/scenes/**/*.scene', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
 export interface SceneEntry {
   file: string;
-  source: string;
   scene: Scene | null;
   diags: Diag[];
-  id: string;
 }
-
-export const TRACKS: Record<string, string> = {
-  net: 'Networking',
-  linux: 'Linux',
-  docker: 'Docker',
-  k8s: 'Kubernetes',
-  code: 'Programming',
-  robo: 'Robotics',
-};
 
 export const entries: SceneEntry[] = Object.entries(files)
   .sort(([a], [b]) => a.localeCompare(b))
-  .map(([file, source]) => {
-    const { scene, diags } = compile(source, packs);
-    return { file, source, scene, diags, id: scene?.id ?? file };
-  });
+  .map(([file, source]) => ({ file, ...compile(source, packs) }));
 
-export const byId = (id: string) => entries.find((e) => e.scene?.id === id);
+export const byId = (id: string) => entries.find((e) => e.scene?.id === id)?.scene ?? null;
+
+export const catalogEntries = (): CatalogEntry[] =>
+  entries.map((e) => ({
+    file: e.file.replace(/^\/scenes\//, ''),
+    scene: e.scene && { id: e.scene.id, title: e.scene.title, about: e.scene.about, packs: e.scene.packs, steps: e.scene.steps.length },
+    errors: e.diags.filter((d) => d.severity === 'error').map((d) => `L${d.line}: ${d.msg}`),
+  }));

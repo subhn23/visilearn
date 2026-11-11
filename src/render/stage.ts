@@ -3,7 +3,9 @@ import type { Layout } from '../core/layout.ts';
 import type { Effects, Entity, PackRegistry, Scene, Tone, TravelOpts } from '../core/types.ts';
 
 const NS = 'http://www.w3.org/2000/svg';
-const FALLBACK_ICON = '<rect x="8" y="8" width="32" height="32" rx="6" fill="var(--node-fill)" stroke="currentColor" stroke-width="2.2"/>';
+const FALLBACK_ICON = '<rect x="10" y="10" width="28" height="28" rx="5" fill="var(--node-fill)" stroke="currentColor" stroke-width="2.2"/>';
+const PLATE = 33; // half-size of the node plate
+const CY = -8; // plate centre offset (labels sit below)
 
 function el<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number> = {}, parent?: Element) {
   const n = document.createElementNS(NS, tag);
@@ -56,10 +58,6 @@ export class Stage implements Effects {
     });
     this.svg.style.aspectRatio = `${width} / ${height + top}`;
 
-    const defs = el('defs', {}, this.svg);
-    const glow = el('filter', { id: 'glow', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
-    el('feGaussianBlur', { stdDeviation: 3 }, glow);
-
     const gLinks = el('g', { class: 'links' }, this.svg);
     this.gDecor = el('g', { class: 'decor' }, this.svg);
     const gNodes = el('g', { class: 'nodes' }, this.svg);
@@ -69,12 +67,19 @@ export class Stage implements Effects {
     for (const [a, b] of scene.links) {
       const pa = this.layout.pos.get(a)!;
       const pb = this.layout.pos.get(b)!;
-      const line = el('line', { x1: pa.x, y1: pa.y - 8, x2: pb.x, y2: pb.y - 8, class: 'link' }, gLinks);
+      const line = el('line', { x1: pa.x, y1: pa.y + CY, x2: pb.x, y2: pb.y + CY, class: 'link' }, gLinks);
       this.linkEls.push({ a, b, el: line });
+      // little "ports" where the cable meets each plate
+      for (const [p, q] of [[pa, pb], [pb, pa]]) {
+        const dx = q.x - p.x, dy = q.y - p.y, len = Math.hypot(dx, dy) || 1;
+        const k = (PLATE + 7) / Math.max(Math.abs(dx / len), Math.abs(dy / len), 0.0001) / len;
+        el('circle', { cx: p.x + dx * Math.min(k, 0.5), cy: p.y + CY + dy * Math.min(k, 0.5), r: 3.5, class: 'port' }, gLinks);
+      }
     }
 
     for (const e of scene.entities) {
       const p = this.layout.pos.get(e.id)!;
+      const kind = registry[e.pack].entities[e.kind];
       const g = el('g', {
         class: `node kind-${e.kind}`,
         transform: `translate(${p.x} ${p.y})`,
@@ -82,18 +87,20 @@ export class Stage implements Effects {
         role: 'button',
         'aria-label': `${e.label} (${e.kind})${e.sub ? ` ${e.sub}` : ''}`,
       }, gNodes);
-      el('circle', { r: 40, cy: -8, class: 'halo' }, g);
-      el('circle', { r: 34, cy: -8, class: 'plate' }, g);
-      const icon = el('g', { transform: 'translate(-24 -32)', class: 'icon' }, g);
+      const body = el('g', { class: 'body' }, g);
+      el('rect', { x: -PLATE - 7, y: CY - PLATE - 7, width: (PLATE + 7) * 2, height: (PLATE + 7) * 2, rx: 16, class: 'ring' }, body);
+      el('rect', { x: -PLATE + 4, y: CY - PLATE + 4, width: PLATE * 2, height: PLATE * 2, rx: 12, class: 'shadow' }, body);
+      el('rect', { x: -PLATE, y: CY - PLATE, width: PLATE * 2, height: PLATE * 2, rx: 12, class: `plate swatch-${kind?.swatch ?? 'sky'}` }, body);
+      const icon = el('g', { transform: `translate(-24 ${CY - 24})`, class: 'icon' }, body);
       icon.innerHTML = registry[e.pack].icons?.[e.kind] ?? FALLBACK_ICON;
-      const label = el('text', { y: 44, class: 'label' }, g);
+      const label = el('text', { y: 48, class: 'label' }, g);
       label.textContent = e.label;
       if (e.sub) {
-        const sub = el('text', { y: 60, class: 'sub' }, g);
+        const sub = el('text', { y: 63, class: 'sub' }, g);
         sub.textContent = e.sub;
       }
-      const x = el('g', { class: 'down-mark', transform: 'translate(0 -8)' }, g);
-      el('path', { d: 'M-14 -14L14 14M14 -14L-14 14' }, x);
+      const x = el('g', { class: 'down-mark', transform: `translate(0 ${CY})` }, g);
+      el('path', { d: 'M-15 -15L15 15M15 -15L-15 15' }, x);
       const select = () => this.onSelect(e);
       g.addEventListener('click', select);
       g.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); select(); } });
@@ -124,22 +131,27 @@ export class Stage implements Effects {
   travel(path: string[], o: TravelOpts = {}): Promise<void> {
     if (this.instant || path.length < 2) return Promise.resolve();
     const epoch = this.epoch;
-    const pts = path.map((id) => this.layout.pos.get(id)!).map((p) => ({ x: p.x, y: p.y - 8 }));
-    const g = el('g', { class: `packet tone-${o.tone ?? 'info'}${o.dashed ? ' dashed' : ''}`, transform: `translate(${pts[0].x} ${pts[0].y})` }, this.gPackets);
-    el('circle', { r: o.dashed ? 6 : 8, class: 'dot' }, g);
+    const pts = path.map((id) => this.layout.pos.get(id)!).map((p) => ({ x: p.x, y: p.y + CY }));
+    const g = el('g', {
+      class: `packet tone-${o.tone ?? 'info'}${o.dashed ? ' dashed' : ''}`,
+      transform: `translate(${pts[0].x} ${pts[0].y})`,
+    }, this.gPackets);
+    const r = o.dashed ? 6.5 : 8.5;
+    el('circle', { r, cx: 2.5, cy: 2.5, class: 'dot-shadow' }, g);
+    el('circle', { r, class: 'dot' }, g);
     if (o.label) {
-      const t = el('text', { y: -14, class: 'packet-label' }, g);
+      const t = el('text', { y: -15, class: 'packet-label' }, g);
       t.textContent = o.label;
     }
-    const trail = el('polyline', { class: `trail tone-${o.tone ?? 'info'}`, points: '' }, this.gDecor);
-    const segDur = this.dur(o.dashed ? 360 : 520);
+    const trail = o.dashed ? null : el('polyline', { class: 'trail', points: '' }, this.gDecor);
+    const segDur = this.dur(o.dashed ? 380 : 560);
     const total = segDur * (pts.length - 1);
     const t0 = performance.now();
 
     return new Promise((resolve) => {
       const frame = (now: number) => {
-        if (epoch !== this.epoch) { g.remove(); trail.remove(); resolve(); return; }
-        const t = Math.min(1, (now - t0) / total);
+        if (epoch !== this.epoch) { g.remove(); trail?.remove(); resolve(); return; }
+        const t = Math.min(1, Math.max(0, (now - t0) / total)); // rAF time can precede t0
         const f = t * (pts.length - 1);
         const i = Math.min(Math.floor(f), pts.length - 2);
         const k = f - i;
@@ -147,12 +159,13 @@ export class Stage implements Effects {
         const x = pts[i].x + (pts[i + 1].x - pts[i].x) * ease;
         const y = pts[i].y + (pts[i + 1].y - pts[i].y) * ease;
         g.setAttribute('transform', `translate(${x} ${y})`);
-        if (!o.dashed) trail.setAttribute('points', [...pts.slice(0, i + 1), { x, y }].map((p) => `${p.x},${p.y}`).join(' '));
+        trail?.setAttribute('points', [...pts.slice(0, i + 1), { x, y }].map((p) => `${p.x},${p.y}`).join(' '));
         if (t < 1) requestAnimationFrame(frame);
         else {
           g.classList.add('arrived');
-          setTimeout(() => g.remove(), this.dur(250));
-          setTimeout(() => trail.classList.add('fade'), this.dur(400));
+          setTimeout(() => g.remove(), this.dur(o.tone === 'bad' ? 320 : 380));
+          setTimeout(() => trail?.classList.add('fade'), this.dur(300));
+          setTimeout(() => trail?.remove(), this.dur(1200));
           resolve();
         }
       };
@@ -183,13 +196,14 @@ export class Stage implements Effects {
     if (!p) return;
     const lines = wrap(text);
     const lh = 15;
-    const w = Math.max(...lines.map((l) => l.length)) * 6.6 + 20;
-    const h = lines.length * lh + 12;
-    const g = el('g', { class: 'note', transform: `translate(${p.x} ${p.y - 60 - h})` }, this.gNotes);
-    el('rect', { x: -w / 2, y: 0, width: w, height: h, rx: 7 }, g);
-    el('path', { d: `M-7 ${h} L0 ${h + 8} L7 ${h} Z`, class: 'tail' }, g);
+    const w = Math.max(...lines.map((l) => l.length)) * 7 + 22;
+    const h = lines.length * lh + 14;
+    const g = el('g', { class: 'note', transform: `translate(${p.x} ${p.y - 58 - h})` }, this.gNotes);
+    el('rect', { x: -w / 2 + 3, y: 3, width: w, height: h, rx: 8, class: 'note-shadow' }, g);
+    el('rect', { x: -w / 2, y: 0, width: w, height: h, rx: 8 }, g);
+    el('path', { d: `M-7 ${h - 1} L0 ${h + 8} L7 ${h - 1}`, class: 'tail' }, g);
     lines.forEach((l, i) => {
-      const t = el('text', { x: 0, y: 6 + lh * (i + 0.8) }, g);
+      const t = el('text', { x: 0, y: 7 + lh * (i + 0.8) }, g);
       t.textContent = l;
     });
   }

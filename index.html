@@ -5,9 +5,327 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Learn computer science by seeing and doing: interactive, animated concept scenes." />
     <title>visilearn</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Crect x='1' y='1' width='13' height='13' rx='3' fill='%23e3c27a' stroke='%235c5249' stroke-width='2'/%3E%3Crect x='14' y='14' width='13' height='13' rx='3' fill='%23e9b79c' stroke='%235c5249' stroke-width='2'/%3E%3Crect x='14' y='1' width='13' height='13' rx='3' fill='%23a9c4d8' stroke='%235c5249' stroke-width='2'/%3E%3C/svg%3E" />
+    <!-- set theme before first paint (no flash) -->
+    <script>try{var p=localStorage.getItem('visilearn.theme');var d=p==='dark'||(p!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light'}catch(e){}</script>
+    <script type="module" src="/src/app/main.ts"></script>
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="/src/app/main.ts"></script>
+    <!-- ================= NAV ================= -->
+    <header class="sticky top-0 z-30 border-b-2 border-stroke bg-paper/95 backdrop-blur" x-data>
+      <div class="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
+        <a href="#/" class="flex items-center gap-2.5 font-mono text-lg font-bold tracking-tight" aria-label="visilearn home">
+          <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+            <rect x="3" y="3" width="13" height="13" rx="3" fill="var(--shadow)"/><rect x="1" y="1" width="13" height="13" rx="3" fill="var(--mustard)" stroke="var(--stroke)" stroke-width="2"/>
+            <rect x="16" y="16" width="13" height="13" rx="3" fill="var(--shadow)"/><rect x="14" y="14" width="13" height="13" rx="3" fill="var(--peach)" stroke="var(--stroke)" stroke-width="2"/>
+            <rect x="16" y="3" width="13" height="13" rx="3" fill="var(--shadow)"/><rect x="14" y="1" width="13" height="13" rx="3" fill="var(--sky)" stroke="var(--stroke)" stroke-width="2"/>
+          </svg>
+          visilearn
+        </a>
+        <span class="chip hidden bg-card text-ink-soft sm:inline-flex">beta</span>
+        <nav class="ml-auto flex items-center gap-2">
+          <a href="#/" class="btn btn-sm hidden sm:inline-flex" x-show="$store.route.view !== 'catalog'">All topics</a>
+          <button class="btn btn-sm" @click="$store.theme.cycle()" :aria-label="'Theme: ' + $store.theme.label + ' (click to change)'">
+            <svg x-show="$store.theme.pref === 'light'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            <svg x-show="$store.theme.pref === 'dark'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>
+            <svg x-show="$store.theme.pref === 'system'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17z" fill="currentColor"/></svg>
+            <span x-text="$store.theme.label"></span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <main x-data>
+      <!-- ================= CATALOG ================= -->
+      <template x-if="$store.route.view === 'catalog'">
+        <div x-data="catalog" x-init="document.title = 'visilearn'" class="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6">
+
+          <!-- hero -->
+          <section class="brut grid-paper relative overflow-hidden">
+            <div class="grid items-center gap-8 p-6 sm:p-10 lg:grid-cols-[1.15fr_1fr]">
+              <div>
+                <span class="chip bg-mint text-on-swatch">Interactive CS labs</span>
+                <h1 class="mt-4 font-mono text-[clamp(2rem,4.6vw,3.4rem)] font-bold leading-[1.05] tracking-tight">
+                  Learn computer science by <span class="bg-mustard px-1.5 text-on-swatch [box-decoration-break:clone]">seeing</span> &amp; <span class="bg-peach px-1.5 text-on-swatch [box-decoration-break:clone]">doing</span>.
+                </h1>
+                <p class="mt-4 max-w-xl text-lg text-ink-soft">Short, animated scenes you can poke at. Watch a concept move, predict what happens next, then break it and fix it yourself.</p>
+                <div class="mt-6 flex flex-wrap gap-3">
+                  <a href="#topics" class="btn btn-primary">Start learning <span aria-hidden="true">↓</span></a>
+                  <a href="#how" class="btn">How it works</a>
+                </div>
+              </div>
+              <!-- decorative mini-scene -->
+              <svg viewBox="0 0 360 240" class="w-full max-w-md justify-self-center" aria-hidden="true">
+                <line x1="70" y1="120" x2="290" y2="120" stroke="var(--stroke)" stroke-width="2.5"/>
+                <circle cx="110" cy="120" r="3.5" fill="var(--card)" stroke="var(--stroke)" stroke-width="2"/><circle cx="250" cy="120" r="3.5" fill="var(--card)" stroke="var(--stroke)" stroke-width="2"/>
+                <g transform="translate(70 120)"><rect x="-32" y="-32" width="64" height="64" rx="12" fill="var(--shadow)" transform="translate(4 4)"/><rect x="-32" y="-32" width="64" height="64" rx="12" fill="var(--sky)" stroke="var(--stroke)" stroke-width="2.5"/><g transform="translate(-24 -24)" fill="none" stroke="var(--on-swatch)" stroke-width="2.2" stroke-linejoin="round"><rect x="9" y="10" width="30" height="20" rx="2"/><path d="M4 36h40l-3-5H7z"/></g></g>
+                <g transform="translate(180 120)"><rect x="-32" y="-32" width="64" height="64" rx="12" fill="var(--shadow)" transform="translate(4 4)"/><rect x="-32" y="-32" width="64" height="64" rx="12" fill="var(--peach)" stroke="var(--stroke)" stroke-width="2.5"/><g transform="translate(-24 -24)" fill="none" stroke="var(--on-swatch)" stroke-width="2.2"><rect x="6" y="9" width="36" height="30" rx="2"/><path d="M6 19h36M6 29h36M18 9v10M30 9v10M12 19v10M24 19v10M36 19v10M18 29v10M30 29v10"/></g></g>
+                <g transform="translate(290 120)"><rect x="-32" y="-32" width="64" height="64" rx="12" fill="var(--shadow)" transform="translate(4 4)"/><rect x="-32" y="-32" width="64" height="64" rx="12" fill="var(--mint)" stroke="var(--stroke)" stroke-width="2.5"/><g transform="translate(-24 -24)" fill="none" stroke="var(--on-swatch)" stroke-width="2.2"><rect x="11" y="5" width="26" height="11" rx="2"/><rect x="11" y="18.5" width="26" height="11" rx="2"/><rect x="11" y="32" width="26" height="11" rx="2"/></g></g>
+                <g><circle r="8.5" cx="2.5" cy="2.5" fill="var(--shadow)"/><circle r="8.5" fill="var(--mustard)" stroke="var(--stroke)" stroke-width="2.5"/>
+                  <animateMotion dur="3.2s" repeatCount="indefinite" path="M70 120 L290 120" keyPoints="0;0.5;0.5;1" keyTimes="0;0.4;0.55;1" calcMode="linear"/></g>
+                <g transform="translate(180 44)"><rect x="-74" y="-17" width="148" height="30" rx="8" fill="var(--shadow)" transform="translate(3 3)"/><rect x="-74" y="-17" width="148" height="30" rx="8" fill="var(--card)" stroke="var(--stroke)" stroke-width="2"/><text y="3" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="var(--ink)">allow tcp:80 ✓</text></g>
+                <rect x="24" y="196" width="22" height="22" rx="4" fill="var(--lilac)" stroke="var(--stroke)" stroke-width="2"/><rect x="52" y="204" width="14" height="14" rx="3" fill="var(--rose)" stroke="var(--stroke)" stroke-width="2"/>
+                <circle cx="326" cy="206" r="12" fill="var(--mustard)" stroke="var(--stroke)" stroke-width="2"/><path d="M300 34l14-14 14 14z" fill="var(--lilac)" stroke="var(--stroke)" stroke-width="2" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </section>
+
+          <!-- stats -->
+          <section class="mt-6 grid grid-cols-3 gap-3 sm:gap-4" aria-label="Your progress">
+            <div class="brut bg-mustard p-4 text-on-swatch"><div class="font-mono text-3xl font-bold sm:text-4xl" x-text="String(model.stats.total).padStart(2, '0')"></div><div class="label-mono !text-on-swatch/75">Topics</div></div>
+            <div class="brut bg-lilac p-4 text-on-swatch"><div class="font-mono text-3xl font-bold sm:text-4xl" x-text="String(model.stats.started).padStart(2, '0')"></div><div class="label-mono !text-on-swatch/75">In progress</div></div>
+            <div class="brut bg-mint p-4 text-on-swatch"><div class="font-mono text-3xl font-bold sm:text-4xl" x-text="String(model.stats.done).padStart(2, '0')"></div><div class="label-mono !text-on-swatch/75">Completed</div></div>
+          </section>
+
+          <!-- how it works -->
+          <section id="how" class="mt-12 scroll-mt-24">
+            <h2 class="label-mono mb-4">How it works</h2>
+            <ol class="grid gap-4 md:grid-cols-3">
+              <template x-for="(s, i) in [
+                  { t: 'Watch', d: 'Each step animates one idea: a packet travels, a device fails, a rule matches.', c: 'bg-sky' },
+                  { t: 'Predict', d: 'Before the answer is shown, you commit to a guess. Wrong guesses teach the most.', c: 'bg-rose' },
+                  { t: 'Try', d: 'Challenges hand you the controls: edit rules, send packets, hit the goals.', c: 'bg-peach' }]" :key="s.t">
+                <li class="brut flex gap-4 bg-card p-4">
+                  <span class="brut-sm grid h-11 w-11 shrink-0 place-items-center font-mono text-lg font-bold text-on-swatch" :class="s.c" x-text="'0' + (i + 1)"></span>
+                  <div><h3 class="font-mono font-bold" x-text="s.t"></h3><p class="text-sm text-ink-soft" x-text="s.d"></p></div>
+                </li>
+              </template>
+            </ol>
+          </section>
+
+          <!-- tracks -->
+          <div id="topics" class="scroll-mt-24">
+            <template x-for="track in model.tracks" :key="track.key">
+              <section class="mt-12">
+                <div class="mb-4 flex items-center gap-3">
+                  <h2 class="font-mono text-2xl font-bold" x-text="track.name"></h2>
+                  <span class="chip bg-card text-ink-soft" x-text="track.cards.length + ' scenes'"></span>
+                  <span class="h-0.5 flex-1 bg-stroke/30"></span>
+                </div>
+                <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  <template x-for="card in track.cards" :key="card.id">
+                    <a :href="'#/s/' + card.id" class="brut group flex flex-col overflow-hidden bg-card transition-transform duration-150 hover:-translate-x-0.5 hover:-translate-y-0.5">
+                      <div class="relative flex h-24 items-start justify-between border-b-2 border-stroke p-3 text-on-swatch stripes" :class="'bg-' + card.swatch">
+                        <span class="chip border-on-swatch/50 bg-card/60" x-text="card.steps + ' steps'"></span>
+                        <span class="chip border-on-swatch/50 bg-card/60" x-show="card.status !== 'new'" x-text="card.status === 'done' ? 'done ✓' : card.pct + '%'"></span>
+                      </div>
+                      <div class="flex flex-1 flex-col gap-3 p-4">
+                        <h3 class="font-mono text-lg font-bold leading-snug" x-text="card.title"></h3>
+                        <p class="flex-1 text-sm text-ink-soft" x-text="card.about"></p>
+                        <div class="meter" role="progressbar" :aria-valuenow="card.pct" aria-valuemin="0" aria-valuemax="100" :aria-label="card.title + ' progress'">
+                          <span :class="'bg-' + card.swatch" :style="'width:' + card.pct + '%'" x-show="card.pct > 0"></span>
+                        </div>
+                        <span class="brut-sm flex items-stretch overflow-hidden font-mono text-sm font-bold">
+                          <span class="flex-1 px-3 py-2 uppercase tracking-wider" x-text="card.cta"></span>
+                          <span class="grid w-11 place-items-center border-l-2 border-stroke text-on-swatch transition-colors" :class="'bg-' + card.swatch">→</span>
+                        </span>
+                      </div>
+                    </a>
+                  </template>
+                </div>
+              </section>
+            </template>
+
+            <!-- roadmap -->
+            <section class="mt-12" x-show="upcoming.length">
+              <div class="mb-4 flex items-center gap-3">
+                <h2 class="font-mono text-2xl font-bold">Coming soon</h2>
+                <span class="h-0.5 flex-1 bg-stroke/30"></span>
+              </div>
+              <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                <template x-for="t in upcoming" :key="t.key">
+                  <div class="rounded-xl border-2 border-dashed border-stroke/60 p-4 text-ink-soft">
+                    <div class="font-mono font-bold text-ink" x-text="t.name"></div>
+                    <div class="label-mono mt-1">in the lab</div>
+                  </div>
+                </template>
+              </div>
+            </section>
+
+            <!-- broken scenes (author feedback) -->
+            <template x-if="model.broken.length">
+              <section class="brut mt-12 bg-card p-5">
+                <h2 class="font-mono font-bold text-bad">Scenes with errors</h2>
+                <template x-for="b in model.broken" :key="b.file">
+                  <div class="mt-3"><div class="font-mono text-sm font-bold" x-text="b.file"></div>
+                    <ul class="ml-4 list-disc font-mono text-xs text-bad"><template x-for="e in b.errors"><li x-text="e"></li></template></ul></div>
+                </template>
+              </section>
+            </template>
+          </div>
+
+          <!-- progress tools -->
+          <footer class="brut mt-14 flex flex-wrap items-center gap-4 bg-card-2 p-5">
+            <div class="min-w-60 flex-1">
+              <div class="font-mono font-bold">Your progress lives on this device.</div>
+              <p class="text-sm text-ink-soft">No account, no server. Export a file to back up or move to another browser.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button class="btn btn-sm" @click="exportProgress()">Export</button>
+              <label class="btn btn-sm">Import<input type="file" accept="application/json,.json" class="sr-only" @change="importProgress($event)"></label>
+              <button class="btn btn-sm" :class="resetArmed && '!bg-rose text-on-swatch'" @click="resetProgress()" x-text="resetArmed ? 'Click again to erase' : 'Reset'"></button>
+            </div>
+            <p class="w-full font-mono text-xs text-ink-soft" x-show="message" x-text="message" aria-live="polite"></p>
+          </footer>
+        </div>
+      </template>
+
+      <!-- ================= PLAYER ================= -->
+      <template x-if="$store.route.view === 'player'">
+        <div>
+          <template x-for="sid in [$store.route.id]" :key="sid">
+            <div x-data="player(sid)" class="mx-auto max-w-7xl px-4 pb-16 pt-5 sm:px-6">
+              <template x-if="!found">
+                <div class="brut mt-10 bg-card p-8 text-center">
+                  <h1 class="font-mono text-2xl font-bold">Topic not found</h1>
+                  <a href="#/" class="btn btn-primary mt-4">← Back to all topics</a>
+                </div>
+              </template>
+
+              <div x-show="found">
+                <!-- title row -->
+                <div class="mb-5 flex flex-wrap items-center gap-3">
+                  <a href="#/" class="btn btn-icon" aria-label="Back to all topics">←</a>
+                  <h1 class="min-w-0 flex-1 font-mono text-xl font-bold sm:text-2xl" x-text="title"></h1>
+                  <div class="seg" role="group" aria-label="Animation speed">
+                    <template x-for="s in [0.5, 1, 2]" :key="s">
+                      <button :aria-pressed="speed === s" @click="setSpeed(s)" x-text="s + '×'"></button>
+                    </template>
+                  </div>
+                </div>
+
+                <div class="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+                  <!-- left: stage + log -->
+                  <div class="flex min-w-0 flex-col gap-5">
+                    <section class="brut overflow-hidden bg-card">
+                      <header class="win-bar bg-mustard text-on-swatch">
+                        <span class="win-dots"><i class="bg-rose"></i><i class="bg-mint"></i><i class="bg-sky"></i></span>
+                        <span class="flex-1 truncate" x-text="sid + '.scene'"></span>
+                        <span class="chip border-on-swatch/60 bg-card/60"><span class="h-2 w-2 animate-pulse rounded-full bg-bad"></span>live</span>
+                      </header>
+                      <div class="grid-paper overflow-x-auto p-2 sm:p-4" x-ref="stage"></div>
+                      <footer class="flex flex-wrap gap-x-5 gap-y-1 border-t-2 border-stroke bg-card-2 px-3 py-2 font-mono text-[11px] text-ink-soft">
+                        <span class="flex items-center gap-1.5"><i class="h-3 w-3 rounded-full border-2 border-stroke bg-mustard"></i>packet</span>
+                        <span class="flex items-center gap-1.5"><i class="h-3 w-3 rounded-full border-2 border-stroke bg-ok"></i>delivered</span>
+                        <span class="flex items-center gap-1.5"><i class="h-3 w-3 rounded-full border-2 border-stroke bg-bad"></i>dropped</span>
+                        <span class="flex items-center gap-1.5"><i class="h-3 w-3 rounded-full border-2 border-stroke bg-warn"></i>refused</span>
+                        <span class="flex items-center gap-1.5"><i class="h-3 w-3 rounded-full border-2 border-dashed border-stroke bg-sky"></i>reply</span>
+                        <span class="ml-auto hidden sm:inline">click a device to inspect it</span>
+                      </footer>
+                    </section>
+
+                    <section class="brut overflow-hidden bg-card">
+                      <header class="win-bar bg-card-2"><span class="win-dots"><i class="bg-card"></i></span><span>event.log</span></header>
+                      <ol class="max-h-52 overflow-auto px-4 py-2 font-mono text-[12.5px]" aria-live="polite">
+                        <li x-show="!log.length" class="py-1 text-ink-soft">$ waiting for packets…</li>
+                        <template x-for="l in log" :key="l.id">
+                          <li class="border-b border-dashed border-stroke/30 py-1"
+                            :class="{ 'text-ok': l.tone === 'ok', 'text-bad': l.tone === 'bad', 'text-warn': l.tone === 'warn' }" x-text="l.msg"></li>
+                        </template>
+                      </ol>
+                    </section>
+                  </div>
+
+                  <!-- right: lesson -->
+                  <aside class="flex min-w-0 flex-col gap-5 lg:sticky lg:top-20">
+                    <section class="brut bg-card p-5">
+                      <!-- step tracker -->
+                      <ol class="mb-5 flex items-center" aria-label="Steps">
+                        <template x-for="(s, i) in steps" :key="i">
+                          <li class="flex flex-1 items-center last:flex-none">
+                            <button class="brut-sm grid h-8 w-8 shrink-0 place-items-center font-mono text-xs font-bold transition-colors"
+                              :class="i === idx ? 'bg-mustard text-on-swatch' : done.includes(i) ? 'bg-mint text-on-swatch' : 'bg-card text-ink-soft'"
+                              :aria-label="'Step ' + (i + 1) + ': ' + s" :aria-current="i === idx ? 'step' : null" :title="s"
+                              @click="go(i)" x-text="done.includes(i) && i !== idx ? '✓' : i + 1"></button>
+                            <span class="mx-1 h-0.5 flex-1 bg-stroke/40" x-show="i < steps.length - 1"></span>
+                          </li>
+                        </template>
+                      </ol>
+
+                      <div class="label-mono" x-text="'Step ' + (idx + 1) + ' of ' + steps.length"></div>
+                      <h2 class="mt-1 font-mono text-xl font-bold leading-snug" x-text="text"></h2>
+                      <template x-for="p in say"><p class="mt-2 text-ink-soft" x-text="p"></p></template>
+
+                      <!-- predict -->
+                      <template x-if="ask">
+                        <div class="brut-sm mt-4 bg-lilac p-4 text-on-swatch" aria-live="polite">
+                          <span class="chip border-on-swatch/60 bg-card/60">Predict</span>
+                          <p class="mt-2 font-semibold" x-text="ask.question"></p>
+                          <div class="mt-3 flex flex-col gap-2">
+                            <template x-for="(o, i) in ask.options" :key="i">
+                              <button class="brut-sm flex items-center gap-3 bg-card px-3 py-2 text-left text-sm text-ink transition-transform"
+                                :class="{ '!bg-mint !text-on-swatch': o.state === 'right', 'opacity-60 line-through wiggle': o.state === 'wrong', 'hover:-translate-y-0.5 cursor-pointer': o.state === 'idle' }"
+                                :disabled="o.state !== 'idle' || ask.tone === 'ok'" @click="answer(i)">
+                                <span class="grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 border-stroke font-mono text-xs font-bold" x-text="'ABCDEF'[i]"></span>
+                                <span x-text="o.text"></span>
+                              </button>
+                            </template>
+                          </div>
+                          <p class="mt-2 min-h-6 font-mono text-sm font-bold" x-text="ask.feedback"></p>
+                        </div>
+                      </template>
+
+                      <!-- goals -->
+                      <template x-if="goals.length">
+                        <div class="mt-4">
+                          <div class="label-mono mb-2">Checklist</div>
+                          <ul class="flex flex-col gap-2" aria-live="polite">
+                            <template x-for="g in goals" :key="g.label">
+                              <li class="brut-flat flex items-center gap-3 px-3 py-2 text-sm transition-colors" :class="g.met ? 'bg-mint text-on-swatch' : 'bg-card-2'">
+                                <span class="grid h-5 w-5 shrink-0 place-items-center rounded border-2 border-stroke bg-card text-[11px] font-bold text-ink" x-text="g.met ? '✓' : ''"></span>
+                                <span class="font-mono" x-text="g.label"></span>
+                                <span class="sr-only" x-text="g.met ? '(done)' : '(not yet)'"></span>
+                              </li>
+                            </template>
+                          </ul>
+                        </div>
+                      </template>
+
+                      <template x-for="h in hints">
+                        <details class="mt-3 text-sm">
+                          <summary class="cursor-pointer font-mono font-bold">? Show a hint</summary>
+                          <p class="brut-flat mt-2 bg-card-2 px-3 py-2 font-mono text-xs" x-text="h"></p>
+                        </details>
+                      </template>
+
+                      <p class="mt-4 min-h-6 font-mono text-sm font-bold"
+                        :class="{ 'text-ok': status.tone === 'done', 'text-ink-soft': status.tone !== 'done' }" x-text="status.text" aria-live="polite"></p>
+
+                      <div class="mt-3 flex gap-2">
+                        <button class="btn" @click="go(idx - 1)" :disabled="idx === 0" aria-label="Previous step">←</button>
+                        <button class="btn" @click="go(idx)" aria-label="Replay step">↻ Replay</button>
+                        <button class="btn btn-primary ml-auto" @click="next()">
+                          <span x-text="idx === steps.length - 1 ? 'Finish' : 'Next'"></span><span aria-hidden="true" x-text="idx === steps.length - 1 ? '✓' : '→'"></span>
+                        </button>
+                      </div>
+                    </section>
+
+                    <!-- inspector -->
+                    <template x-if="inspector">
+                      <section class="brut overflow-hidden bg-card">
+                        <header class="win-bar text-on-swatch" :class="'bg-' + inspector.swatch">
+                          <span class="win-dots"><i class="bg-card"></i></span>
+                          <span class="flex-1 truncate" x-text="inspector.label"></span>
+                          <span class="chip border-on-swatch/60 bg-card/60" x-text="inspector.kind"></span>
+                          <button class="ml-1 font-bold" @click="closeInspector()" aria-label="Close">✕</button>
+                        </header>
+                        <div class="p-4 text-sm">
+                          <p class="font-mono text-xs text-ink-soft" x-show="inspector.sub" x-text="inspector.sub"></p>
+                          <p class="font-mono text-xs text-ink-soft" x-show="inspector.ports" x-text="'listening on ' + inspector.ports"></p>
+                          <p class="mt-2" x-text="inspector.about"></p>
+                        </div>
+                      </section>
+                    </template>
+
+                    <!-- pack panels (rules editor, packet lab, …) -->
+                    <div x-html="panelHtml"></div>
+                  </aside>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+    </main>
   </body>
 </html>

@@ -121,6 +121,8 @@ export interface EntityKind {
   sub?: string;
   /** allowed key=value props besides the common ones (label, info, col) */
   props?: Record<string, string>;
+  /** UI colour family for this kind: mustard | mint | lilac | peach | sky | rose */
+  swatch?: string;
 }
 
 export interface VerbDef {

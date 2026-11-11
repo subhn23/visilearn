@@ -1,30 +1,14 @@
 import './styles.css';
-import { renderCatalog } from './catalog.ts';
-import { h } from './dom.ts';
-import { mountPlayer } from './player.ts';
-import { byId } from './scenes.ts';
+import Alpine from 'alpinejs';
+import { panels } from './panels.ts';
+import { registerStores } from './stores.ts';
+import { registerCatalog } from './views/catalog.ts';
+import { registerPlayer } from './views/player.ts';
 
-const root = document.getElementById('app')!;
-let cleanup: (() => void) | null = null;
+registerStores(Alpine);
+registerCatalog(Alpine);
+registerPlayer(Alpine);
+for (const p of Object.values(panels)) p.register(Alpine);
 
-function route() {
-  cleanup?.();
-  cleanup = null;
-  const m = /^#\/s\/(.+)$/.exec(location.hash);
-  if (m) {
-    const entry = byId(decodeURIComponent(m[1]));
-    if (entry?.scene) {
-      document.title = `${entry.scene.title} · visilearn`;
-      cleanup = mountPlayer(root, entry.scene);
-      window.scrollTo(0, 0);
-      return;
-    }
-    root.replaceChildren(h('div.catalog', null, h('h1', null, 'Topic not found'), h('a', { href: '#/' }, '← Back to all topics')));
-    return;
-  }
-  document.title = 'visilearn';
-  renderCatalog(root, route);
-}
-
-window.addEventListener('hashchange', route);
-route();
+(window as any).Alpine = Alpine;
+Alpine.start();

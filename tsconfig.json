@@ -13,5 +13,5 @@
     "noUnusedLocals": true,
     "skipLibCheck": true
   },
-  "include": ["src", "mcp", "tools", "tests"]
+  "include": ["src", "mcp", "tools", "tests", "e2e"]
 }

@@ -1,0 +1,77 @@
+<div x-data="netPanel()" class="flex flex-col gap-4">
+  <!-- Firewall rule editor: one card per firewall that has rules -->
+  <template x-for="fw in firewalls" :key="fw">
+    <section x-data="netRules(fw)" class="brut overflow-hidden bg-card">
+      <header class="win-bar bg-peach text-on-swatch">
+        <span class="win-dots"><i class="bg-card"></i></span>
+        <span class="flex-1 truncate" x-text="'firewall://' + fwLabel"></span>
+        <span class="chip border-on-swatch/60" x-text="editable ? 'editable' : 'read-only'"></span>
+      </header>
+      <div class="p-4">
+        <p class="mb-3 text-sm text-ink-soft">Checked <b class="text-ink">top → bottom</b>. The first matching rule wins.</p>
+        <ol class="flex flex-col gap-2">
+          <template x-for="(row, i) in rows" :key="row.id">
+            <li>
+              <div class="flex items-center gap-2">
+                <span class="grid h-8 w-7 shrink-0 place-items-center rounded-md bg-card-2 font-mono text-xs font-bold text-ink-soft" x-text="i + 1"></span>
+                <input class="field" :class="row.error && '!border-bad'" spellcheck="false" autocomplete="off"
+                  :readonly="!editable" :aria-invalid="!!row.error" aria-label="Firewall rule"
+                  placeholder="allow tcp:22 from laptop to web"
+                  x-init="$el.value = row.text" @input="update(row.id, $event.target.value)">
+                <template x-if="editable">
+                  <div class="flex shrink-0 gap-1.5">
+                    <button class="btn btn-sm btn-icon !h-8 !w-8" title="Move up" aria-label="Move rule up" @click="moveUp(row.id)" :disabled="i === 0">↑</button>
+                    <button class="btn btn-sm btn-icon !h-8 !w-8" title="Delete" aria-label="Delete rule" @click="remove(row.id)">✕</button>
+                  </div>
+                </template>
+              </div>
+              <p x-show="row.error" x-text="row.error" class="mt-1 ml-9 font-mono text-xs text-bad" aria-live="polite"></p>
+            </li>
+          </template>
+        </ol>
+        <div class="mt-3 flex items-center justify-between gap-2 border-t-2 border-dashed border-stroke/40 pt-3">
+          <span class="label-mono">No match → policy</span>
+          <div class="seg" role="group" aria-label="Default policy">
+            <button :aria-pressed="policy === 'deny'" @click="setPolicy('deny')" :disabled="!editable">deny</button>
+            <button :aria-pressed="policy === 'allow'" @click="setPolicy('allow')" :disabled="!editable">allow</button>
+          </div>
+        </div>
+        <div class="mt-3 flex gap-2" x-show="editable">
+          <button class="btn btn-sm" @click="add()">+ Add rule</button>
+          <button class="btn btn-sm" @click="reset()">Reset</button>
+        </div>
+      </div>
+    </section>
+  </template>
+
+  <!-- Packet lab: learner sends any packet -->
+  <section x-data="packetLab()" x-show="ends.length >= 2" class="brut overflow-hidden bg-card">
+    <header class="win-bar bg-sky text-on-swatch">
+      <span class="win-dots"><i class="bg-card"></i></span>
+      <span class="flex-1">packet-lab.exe</span>
+    </header>
+    <div class="grid grid-cols-2 gap-3 p-4">
+      <label class="flex min-w-0 flex-col gap-1"><span class="label-mono">From</span>
+        <select class="field" x-model="from"><template x-for="e in ends" :key="e.id"><option :value="e.id" x-text="e.label" :selected="e.id === from"></option></template></select>
+      </label>
+      <label class="flex min-w-0 flex-col gap-1"><span class="label-mono">To</span>
+        <select class="field" x-model="to"><template x-for="e in ends" :key="e.id"><option :value="e.id" x-text="e.label" :selected="e.id === to"></option></template></select>
+      </label>
+      <div class="flex min-w-0 flex-col gap-1"><span class="label-mono">Protocol</span>
+        <div class="seg w-full" role="group" aria-label="Protocol">
+          <template x-for="p in ['tcp', 'udp', 'icmp']" :key="p">
+            <button class="flex-1" :aria-pressed="proto === p" @click="proto = p" x-text="p === 'icmp' ? 'ping' : p"></button>
+          </template>
+        </div>
+      </div>
+      <label class="flex min-w-0 flex-col gap-1"><span class="label-mono">Port</span>
+        <input class="field" type="text" inputmode="numeric" x-model="port" :disabled="proto === 'icmp'" list="well-known-ports" aria-label="Port">
+        <datalist id="well-known-ports"><option value="22"></option><option value="53"></option><option value="80"></option><option value="443"></option><option value="3306"></option></datalist>
+      </label>
+      <p class="col-span-2 font-mono text-xs text-bad" x-show="error" x-text="error" aria-live="polite"></p>
+      <button class="btn btn-primary col-span-2" @click="send()" :disabled="busy">
+        <span x-text="busy ? 'Sending…' : 'Send packet'"></span><span aria-hidden="true">→</span>
+      </button>
+    </div>
+  </section>
+</div>
